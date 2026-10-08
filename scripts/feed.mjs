@@ -18,7 +18,10 @@ export function parseFeed(xml, source) {
    const title=String(value(item.title)).replace(/<[^>]*>/g,'').trim();
    const published=new Date(value(item.published || item.pubDate || item['dc:date'] || item.updated));
    if(!title || !Number.isFinite(published.getTime())) return [];
-   return [{url,title,source:source.name,published:published.toISOString()}];
+   const publisher=source.name.startsWith('Googleニュース：') ? String(value(item.source)).trim() : '';
+   const suffix=' - '+publisher;
+   const displayTitle=publisher && title.endsWith(suffix) ? title.slice(0,-suffix.length).trim() : title;
+   return [{url,title:displayTitle,source:publisher || source.name,published:published.toISOString()}];
   } catch {return [];}
  });
 }

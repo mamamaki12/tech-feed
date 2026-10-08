@@ -1,30 +1,190 @@
 [
- {"name":"ITmedia NEWS","url":"https://rss.itmedia.co.jp/rss/2.0/news_bursts.xml"},
- {"name":"ITmedia AI＋","url":"https://rss.itmedia.co.jp/rss/2.0/aiplus.xml"},
- {"name":"＠IT","url":"https://rss.itmedia.co.jp/rss/2.0/ait.xml"},
- {"name":"PC Watch","url":"https://pc.watch.impress.co.jp/sublink/pc.rdf"},
- {"name":"INTERNET Watch","url":"https://internet.watch.impress.co.jp/data/rss/1.0/iw/feed.rdf"},
- {"name":"窓の杜","url":"https://forest.watch.impress.co.jp/data/rss/1.0/wf/feed.rdf"},
- {"name":"ケータイ Watch","url":"https://k-tai.watch.impress.co.jp/data/rss/1.0/ktw/feed.rdf"},
- {"name":"Impress Watch","url":"https://www.watch.impress.co.jp/data/rss/1.0/ipw/feed.rdf"},
- {"name":"Publickey","url":"https://www.publickey1.jp/atom.xml"},
- {"name":"Zenn","url":"https://zenn.dev/feed"},
- {"name":"Qiita","url":"https://qiita.com/popular-items/feed"},
- {"name":"DevelopersIO","url":"https://dev.classmethod.jp/feed/"},
- {"name":"GMO Developers","url":"https://developers.gmo.jp/feed/"},
- {"name":"さくらのナレッジ","url":"https://knowledge.sakura.ad.jp/rss/"},
- {"name":"AWS Japan Blog","url":"https://aws.amazon.com/jp/blogs/news/feed/"},
- {"name":"Google Japan Blog","url":"https://japan.googleblog.com/atom.xml"},
- {"name":"LINEヤフー Tech Blog","url":"https://techblog.lycorp.co.jp/ja/feed/index.xml"},
- {"name":"メルカリ Engineering","url":"https://engineering.mercari.com/blog/feed.xml"},
- {"name":"CyberAgent Developers","url":"https://developers.cyberagent.co.jp/blog/feed/"},
- {"name":"クックパッド開発者ブログ","url":"https://techlife.cookpad.com/feed"},
- {"name":"SmartHR Tech Blog","url":"https://tech.smarthr.jp/feed"},
- {"name":"はてな Developer Blog","url":"https://developer.hatenastaff.com/feed"},
- {"name":"DeNA Engineering","url":"https://engineering.dena.com/blog/index.xml"},
- {"name":"サイボウズ Inside Out","url":"https://blog.cybozu.io/feed"},
- {"name":"Sansan Builders Box","url":"https://buildersbox.corp-sansan.com/feed"},
- {"name":"freee Developers Hub","url":"https://developers.freee.co.jp/feed"},
- {"name":"ペパボ Tech Blog","url":"https://tech.pepabo.com/feed.xml"},
- {"name":"SRE Magazine","url":"https://sre-magazine.net/index.xml"}
+  {
+    "name": "ITmedia NEWS",
+    "url": "https://rss.itmedia.co.jp/rss/2.0/news_bursts.xml"
+  },
+  {
+    "name": "ITmedia AI＋",
+    "url": "https://rss.itmedia.co.jp/rss/2.0/aiplus.xml"
+  },
+  {
+    "name": "＠IT",
+    "url": "https://rss.itmedia.co.jp/rss/2.0/ait.xml"
+  },
+  {
+    "name": "PC Watch",
+    "url": "https://pc.watch.impress.co.jp/sublink/pc.rdf"
+  },
+  {
+    "name": "INTERNET Watch",
+    "url": "https://internet.watch.impress.co.jp/data/rss/1.0/iw/feed.rdf"
+  },
+  {
+    "name": "窓の杜",
+    "url": "https://forest.watch.impress.co.jp/data/rss/1.0/wf/feed.rdf"
+  },
+  {
+    "name": "ケータイ Watch",
+    "url": "https://k-tai.watch.impress.co.jp/data/rss/1.0/ktw/feed.rdf"
+  },
+  {
+    "name": "Impress Watch",
+    "url": "https://www.watch.impress.co.jp/data/rss/1.0/ipw/feed.rdf"
+  },
+  {
+    "name": "Publickey",
+    "url": "https://www.publickey1.jp/atom.xml"
+  },
+  {
+    "name": "Zenn",
+    "url": "https://zenn.dev/feed"
+  },
+  {
+    "name": "Qiita",
+    "url": "https://qiita.com/popular-items/feed"
+  },
+  {
+    "name": "DevelopersIO",
+    "url": "https://dev.classmethod.jp/feed/"
+  },
+  {
+    "name": "GMO Developers",
+    "url": "https://developers.gmo.jp/feed/"
+  },
+  {
+    "name": "さくらのナレッジ",
+    "url": "https://knowledge.sakura.ad.jp/rss/"
+  },
+  {
+    "name": "AWS Japan Blog",
+    "url": "https://aws.amazon.com/jp/blogs/news/feed/"
+  },
+  {
+    "name": "Google Japan Blog",
+    "url": "https://japan.googleblog.com/atom.xml"
+  },
+  {
+    "name": "LINEヤフー Tech Blog",
+    "url": "https://techblog.lycorp.co.jp/ja/feed/index.xml"
+  },
+  {
+    "name": "メルカリ Engineering",
+    "url": "https://engineering.mercari.com/blog/feed.xml"
+  },
+  {
+    "name": "CyberAgent Developers",
+    "url": "https://developers.cyberagent.co.jp/blog/feed/"
+  },
+  {
+    "name": "クックパッド開発者ブログ",
+    "url": "https://techlife.cookpad.com/feed"
+  },
+  {
+    "name": "SmartHR Tech Blog",
+    "url": "https://tech.smarthr.jp/feed"
+  },
+  {
+    "name": "はてな Developer Blog",
+    "url": "https://developer.hatenastaff.com/feed"
+  },
+  {
+    "name": "DeNA Engineering",
+    "url": "https://engineering.dena.com/blog/index.xml"
+  },
+  {
+    "name": "サイボウズ Inside Out",
+    "url": "https://blog.cybozu.io/feed"
+  },
+  {
+    "name": "Sansan Builders Box",
+    "url": "https://buildersbox.corp-sansan.com/feed"
+  },
+  {
+    "name": "freee Developers Hub",
+    "url": "https://developers.freee.co.jp/feed"
+  },
+  {
+    "name": "ペパボ Tech Blog",
+    "url": "https://tech.pepabo.com/feed.xml"
+  },
+  {
+    "name": "SRE Magazine",
+    "url": "https://sre-magazine.net/index.xml"
+  },
+  {
+    "name": "ITmedia エンタープライズ",
+    "url": "https://rss.itmedia.co.jp/rss/2.0/enterprise.xml"
+  },
+  {
+    "name": "ITmedia Mobile",
+    "url": "https://rss.itmedia.co.jp/rss/2.0/mobile.xml"
+  },
+  {
+    "name": "ITmedia PC USER",
+    "url": "https://rss.itmedia.co.jp/rss/2.0/pcuser.xml"
+  },
+  {
+    "name": "Security NEXT",
+    "url": "https://www.security-next.com/feed"
+  },
+  {
+    "name": "ScanNetSecurity",
+    "url": "https://scan.netsecurity.ne.jp/rss20/index.rdf"
+  },
+  {
+    "name": "gihyo.jp",
+    "url": "https://gihyo.jp/feed/rss2"
+  },
+  {
+    "name": "GIGAZINE",
+    "url": "https://gigazine.net/news/rss_2.0/"
+  },
+  {
+    "name": "ギズモード・ジャパン",
+    "url": "https://www.gizmodo.jp/feed/index.xml"
+  },
+  {
+    "name": "JPCERT/CC",
+    "url": "https://www.jpcert.or.jp/rss/jpcert-all.rdf"
+  },
+  {
+    "name": "徳丸浩の日記",
+    "url": "https://blog.tokumaru.org/feeds/posts/default?alt=rss"
+  },
+  {
+    "name": "ZOZO TECH BLOG",
+    "url": "https://techblog.zozo.com/feed"
+  },
+  {
+    "name": "LayerX エンジニアブログ",
+    "url": "https://tech.layerx.co.jp/feed"
+  },
+  {
+    "name": "TVer Tech Blog",
+    "url": "https://techblog.tver.co.jp/feed"
+  },
+  {
+    "name": "カヤックエンジニアブログ",
+    "url": "https://techblog.kayac.com/feed"
+  },
+  {
+    "name": "Money Forward Developers Blog",
+    "url": "https://moneyforward-dev.jp/feed"
+  },
+  {
+    "name": "ドワンゴ エンジニアブログ",
+    "url": "https://dwango.github.io/index.xml"
+  },
+  {
+    "name": "note エンジニアブログ",
+    "url": "https://engineerteam.note.jp/rss"
+  },
+  {
+    "name": "Wantedly Engineering",
+    "url": "https://www.wantedly.com/stories/s/wantedly_engineers/rss.xml"
+  },
+  {
+    "name": "Googleニュース：セキュリティ",
+    "url": "https://news.google.com/rss/search?q=%E4%B8%8D%E6%AD%A3%E3%82%A2%E3%82%AF%E3%82%BB%E3%82%B9%20OR%20%E6%83%85%E5%A0%B1%E6%BC%8F%E6%B4%A9%20when%3A30d&hl=ja&gl=JP&ceid=JP%3Aja"
+  }
 ]

@@ -33,7 +33,11 @@ function render(){
 for(const id of ['search','topic','period','view','unread'])$(id).addEventListener(id==='search'?'input':'change',()=>{limit=40;if(data)render();});
 $('more').onclick=()=>{limit+=40;render();};
 $('settings').onclick=()=>{
- $('sources').replaceChildren();for(const s of data?.sources||[]){const label=document.createElement('label'),check=document.createElement('input'),name=document.createElement('span'),status=document.createElement('small');check.type='checkbox';check.checked=!state.blocked.includes(s.name);check.onchange=()=>{state.blocked=state.blocked.filter(x=>x!==s.name);if(!check.checked)state.blocked.push(s.name);persist();render();};name.textContent=s.name;status.textContent=s.ok?`${s.count}件取得`:'取得失敗';label.append(check,name,status);$('sources').append(label);}
+ const sources=new Map((data?.sources||[]).map(s=>[s.name,{...s}]));
+ for(const a of data?.articles||[]){if(!sources.has(a.source))sources.set(a.source,{name:a.source,ok:true,count:0});}
+ for(const name of state.blocked){if(!sources.has(name))sources.set(name,{name,ok:true,count:0});}
+ for(const s of sources.values())s.count=(data?.articles||[]).filter(a=>a.source===s.name).length;
+ $('sources').replaceChildren();for(const s of sources.values()){const label=document.createElement('label'),check=document.createElement('input'),name=document.createElement('span'),status=document.createElement('small');check.type='checkbox';check.checked=!state.blocked.includes(s.name);check.onchange=()=>{state.blocked=state.blocked.filter(x=>x!==s.name);if(!check.checked)state.blocked.push(s.name);persist();render();};name.textContent=s.name;status.textContent=s.ok?`${s.count}件掲載`:'取得失敗';label.append(check,name,status);$('sources').append(label);}
  $('excluded').value=state.excluded;$('storage').textContent=storageOK?'設定はこのブラウザに保存されます。':'ブラウザへの保存が利用できません。';$('dialog').showModal();
 };
 $('close').onclick=()=>$('dialog').close();$('excluded').oninput=()=>{state.excluded=$('excluded').value;persist();if(data)render();};
