@@ -1,0 +1,1 @@
+{"name":"tech-feed","version":"1.0.0","private":true,"type":"module","scripts":{"collect":"node scripts/collect.mjs","test":"node --test","serve":"node scripts/serve.mjs"},"dependencies":{"fast-xml-parser":"^5.3.0"}}
