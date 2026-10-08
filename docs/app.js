@@ -14,7 +14,17 @@ function render(){
   let url;try{url=new URL(a.url);if(!['http:','https:'].includes(url.protocol))continue;}catch{continue;}
   const article=document.createElement('article');article.className='article';article.classList.toggle('read',state.read.includes(a.url));
   const meta=document.createElement('div');meta.className='meta';const source=document.createElement('span');source.className='source';source.textContent=a.source;const time=document.createElement('time');time.dateTime=a.published;time.textContent=new Date(a.published).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});meta.append(source,time);
-  const link=document.createElement('a');link.className='title';link.textContent=a.title;link.href=url.href;link.target='_blank';link.rel='noopener noreferrer';link.onclick=()=>{if(!state.read.includes(a.url))state.read.push(a.url);persist();article.classList.add('read');};
+  const link=document.createElement('a');link.className='title';link.textContent=a.title;link.href=url.href;link.target='_blank';link.rel='noopener noreferrer';
+  const markRead=()=>{
+   if(!state.read.includes(a.url)){state.read.push(a.url);persist();}
+   article.classList.add('read');
+   const readButton=article.querySelector('.actions button:last-child');
+   if(readButton)readButton.textContent='未読に戻す';
+  };
+  link.addEventListener('click',markRead);
+  link.addEventListener('auxclick',event=>{if(event.button===1)markRead();});
+  // Mark before the browser switches to the article's new tab.
+  link.addEventListener('pointerup',event=>{if(event.button===0)markRead();});
   const actions=document.createElement('div');actions.className='actions';
   actions.append(button(state.saved.includes(a.url)?'✓ 保存済み':'＋ あとで読む',()=>{state.saved=state.saved.includes(a.url)?state.saved.filter(x=>x!==a.url):[...state.saved,a.url];persist();render();},state.saved.includes(a.url)),button('有料だった',()=>{state.paid.push(a.url);persist();render();toast('記事を非表示にしました');if(confirm(`「${a.source}」の記事をすべて除外しますか？\nキャンセルすると、この記事だけを非表示にします。`)){state.blocked.push(a.source);persist();render();}}),button(state.read.includes(a.url)?'未読に戻す':'既読にする',()=>{state.read=state.read.includes(a.url)?state.read.filter(x=>x!==a.url):[...state.read,a.url];persist();render();}));
   article.append(meta,link,actions);$('articles').append(article);
