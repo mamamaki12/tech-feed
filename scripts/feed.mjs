@@ -2,6 +2,9 @@ import { XMLParser } from 'fast-xml-parser';
 const parser = new XMLParser({ignoreAttributes:false,attributeNamePrefix:'@_'});
 const list = x => x ? (Array.isArray(x) ? x : [x]) : [];
 const value = x => typeof x === 'object' ? x?.['#text'] || '' : x || '';
+export function feedText(raw){
+ return String(value(raw)).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,' ').replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,' ').replace(/<[^>]*>/g,' ').replace(/&#(x[0-9a-f]+|\d+);/gi,(_,n)=>{const code=n[0].toLowerCase()==='x'?parseInt(n.slice(1),16):Number(n);return code<=0x10ffff?String.fromCodePoint(code):' ';}).replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/\s+/g,' ').trim();
+}
 export function normalizeUrl(raw) {
  const u = new URL(raw);
  if (!['https:','http:'].includes(u.protocol)) throw new Error('Invalid protocol');
@@ -21,7 +24,8 @@ export function parseFeed(xml, source) {
    const publisher=source.name.startsWith('Googleニュース：') ? String(value(item.source)).trim() : '';
    const suffix=' - '+publisher;
    const displayTitle=publisher && title.endsWith(suffix) ? title.slice(0,-suffix.length).trim() : title;
-   return [{url,title:displayTitle,source:publisher || source.name,published:published.toISOString()}];
+   const body=source.name.startsWith('Googleニュース：')?'':feedText(item['content:encoded'] || item.content || item.description || item.summary).slice(0,50000);
+   return [{url,title:displayTitle,source:publisher || source.name,published:published.toISOString(),body}];
   } catch {return [];}
  });
 }
