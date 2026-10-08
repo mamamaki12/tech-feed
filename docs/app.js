@@ -18,15 +18,18 @@ function render(){
   const markRead=()=>{
    if(!state.read.includes(a.url)){state.read.push(a.url);persist();}
    article.classList.add('read');
-   const readButton=article.querySelector('.actions button:last-child');
-   if(readButton)readButton.textContent='未読に戻す';
+   article.querySelector('.mark-read')?.remove();
   };
   link.addEventListener('click',markRead);
   link.addEventListener('auxclick',event=>{if(event.button===1)markRead();});
   // Mark before the browser switches to the article's new tab.
   link.addEventListener('pointerup',event=>{if(event.button===0)markRead();});
   const actions=document.createElement('div');actions.className='actions';
-  actions.append(button(state.saved.includes(a.url)?'✓ 保存済み':'＋ あとで読む',()=>{state.saved=state.saved.includes(a.url)?state.saved.filter(x=>x!==a.url):[...state.saved,a.url];persist();render();},state.saved.includes(a.url)),button('有料だった',()=>{state.paid.push(a.url);persist();render();toast('記事を非表示にしました');if(confirm(`「${a.source}」の記事をすべて除外しますか？\nキャンセルすると、この記事だけを非表示にします。`)){state.blocked.push(a.source);persist();render();}}),button(state.read.includes(a.url)?'未読に戻す':'既読にする',()=>{state.read=state.read.includes(a.url)?state.read.filter(x=>x!==a.url):[...state.read,a.url];persist();render();}));
+  actions.append(button(state.saved.includes(a.url)?'✓ 保存済み':'＋ あとで読む',()=>{state.saved=state.saved.includes(a.url)?state.saved.filter(x=>x!==a.url):[...state.saved,a.url];persist();render();},state.saved.includes(a.url)),button('有料だった',()=>{state.paid.push(a.url);persist();render();toast('記事を非表示にしました');if(confirm(`「${a.source}」の記事をすべて除外しますか？\nキャンセルすると、この記事だけを非表示にします。`)){state.blocked.push(a.source);persist();render();}}));
+  if(!state.read.includes(a.url)){
+   const readButton=button('既読にする',()=>{markRead();render();});
+   readButton.classList.add('mark-read');actions.append(readButton);
+  }
   article.append(meta,link,actions);$('articles').append(article);
  }
  if(!items.length){const p=document.createElement('p');p.className='empty';p.textContent='該当する記事がありません。検索条件や配信元の除外設定を変更してください。';$('articles').append(p);}
