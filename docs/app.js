@@ -22,7 +22,7 @@ function render(){
   }
   const article=document.createElement('article');article.className='article';article.classList.toggle('read',state.read.includes(a.url));
   const meta=document.createElement('div');meta.className='meta';const source=document.createElement('span');source.className='source';source.textContent=a.source;const time=document.createElement('time');time.dateTime=a.published;time.textContent=new Date(a.published).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});meta.append(source,time);
-  const link=document.createElement('a');link.className='title';link.textContent=a.title;link.href=url.href;link.target='_blank';link.rel='noopener noreferrer';
+  const link=document.createElement('a');link.className='title';link.textContent=a.title;link.href=url.href;link.rel='noopener noreferrer';
   const markRead=()=>{
    if(!state.read.includes(a.url)){state.read.push(a.url);persist();}
    article.classList.add('read');
