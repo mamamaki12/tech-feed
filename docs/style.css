@@ -3,3 +3,4 @@
 
 .body-heading{margin:35px 0 8px;padding-top:22px;border-top:2px solid #cbd6bb}.search-note,.match-snippet{font-size:12px;line-height:1.8;color:#687361}.match-snippet{margin:9px 0}mark{background:#e4edbd;color:inherit}.list-heading #count{max-width:65%;text-align:right}
 .meta .reason{background:#eaf1d6;color:#4d6b28;border-radius:999px;padding:2px 8px;font-weight:500}#interests{line-height:1.8;background:#eef2e4;border-radius:8px;padding:10px 12px}
+.actions button.heart.active{background:#fbe4ea;color:#c2335b}

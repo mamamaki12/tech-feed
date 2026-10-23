@@ -1,11 +1,12 @@
 // おすすめ順: 開いた記事の傾向（配信元・分野・タイトル語）と新しさを掛け合わせて並べる。
 // 興味: 開いた記事の特徴を半減期14日で減衰させて集計し、全記事での出現率と比べた「よく開く度合い」(lift)を使う。
 // 履歴が少ないうちは、全体の出現率どおりの仮想クリックを足して平滑化する（Google Newsの個人化 Liu et al. 2010 と同じ考え方）。
+// ハート: 自分で付けた明示的な好みなので、1件を開いた記事3件分として数え、半減期も60日と長くする。
 // 新しさ: 半減期24時間の指数減衰。log(スコア) = 興味 - ln2 × 経過時間/24h なので「興味が e 倍 ≒ 約1.4日新しい」と同じ重み。
 export const topicPatterns={'AI・生成AI':/AI|生成|機械学習|LLM|GPT|Claude|Gemini/i,'Web・開発':/開発|実装|JavaScript|TypeScript|React|Python|プログラ|CSS|HTML|コード|エンジニア/i,'セキュリティ':/セキュリティ|脆弱|攻撃|漏洩|認証|マルウェア/i,'クラウド・インフラ':/クラウド|AWS|Azure|サーバ|Docker|Kubernetes|インフラ|データベース|SRE/i,'ガジェット':/スマホ|iPhone|Android|PC|パソコン|デバイス|イヤホン|ガジェット|ディスプレイ/i};
 const HOUR=3600000,DAY=24*HOUR;
-export const config={interestHalfLifeDays:14,freshHalfLifeHours:24,smoothing:5,priorFloor:10,minTermWeight:1.5,maxClicks:500,readPenalty:Math.log(4),weights:{source:0.6,topic:0.8,term:0.6}};
-const stopTerms=new Set(['こと','もの','ため','よう','これ','それ','発表','提供','開始','対応','公開','記事','方法','紹介','解説','について','ニュース','まとめ','今回','新た','可能','実現','向け','以上','以下','年月','月日','本日','今日','発売','the','and','for','with','new']);
+export const config={interestHalfLifeDays:14,freshHalfLifeHours:24,smoothing:5,priorFloor:10,minTermWeight:1.5,maxClicks:500,likeWeight:3,likeHalfLifeDays:60,readPenalty:Math.log(4),weights:{source:0.6,topic:0.8,term:0.6}};
+const stopTerms=new Set(['こと','もの','ため','よう','これ','それ','発表','提供','開始','対応','公開','記事','方法','紹介','解説','について','ニュース','まとめ','今回','新た','可能','実現','向け','以上','以下','年月','月日','本日','今日','発売','問題','the','and','for','with','new']);
 const cache=new WeakMap();
 export function features(a){
  if(cache.has(a))return cache.get(a);
@@ -21,13 +22,19 @@ export function recordClick(clicks,a,now=Date.now()){
  if(clicks.some(c=>c.u===a.url))return clicks;
  return [...clicks,{u:a.url,t:now,f:features(a)}].slice(-config.maxClicks);
 }
-export function buildModel(articles,clicks,now=Date.now()){
+export function toggleLike(likes,a,now=Date.now()){
+ if(likes.some(l=>l.u===a.url))return likes.filter(l=>l.u!==a.url);
+ // 記事は30日で一覧から消えるので、ハート一覧を表示できるよう題名なども一緒に保存する。
+ return [...likes,{u:a.url,title:a.title,source:a.source,published:a.published,t:now,f:features(a)}];
+}
+export function buildModel(articles,clicks,now=Date.now(),likes=[]){
  const prior=new Map(),weight=new Map();let total=0;
  for(const a of articles)for(const f of features(a))prior.set(f,(prior.get(f)||0)+1);
  // 出現回数に下駄を履かせ、1〜2件しかない珍しい語や配信元を1回開いただけで過大評価しないようにする。
  for(const [f,n] of prior)prior.set(f,(n+config.priorFloor)/(articles.length+config.priorFloor));
- for(const c of clicks){
-  const d=0.5**(Math.max(0,now-c.t)/(config.interestHalfLifeDays*DAY));total+=d;
+ const signals=[...clicks.map(c=>[c,1,config.interestHalfLifeDays]),...likes.map(l=>[l,config.likeWeight,config.likeHalfLifeDays])];
+ for(const [c,w,halfLife] of signals){
+  const d=w*0.5**(Math.max(0,now-c.t)/(halfLife*DAY));total+=d;
   for(const f of c.f)weight.set(f,(weight.get(f)||0)+d);
  }
  const a=config.smoothing;
