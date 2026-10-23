@@ -38,9 +38,9 @@ function render(){
   // Mark before the browser switches to the article's new tab.
   link.addEventListener('pointerup',event=>{if(event.button===0)markRead();});
   const actions=document.createElement('div');actions.className='actions';
-  const heart=button(liked.has(a.url)?'♥ ハート':'♡ ハート',()=>{state.likes=toggleLike(state.likes,a);persist();render();},liked.has(a.url));heart.classList.add('heart');heart.setAttribute('aria-pressed',liked.has(a.url));
-  actions.append(heart,button(state.saved.includes(a.url)?'✓ 保存済み':'＋ あとで読む',()=>{state.saved=state.saved.includes(a.url)?state.saved.filter(x=>x!==a.url):[...state.saved,a.url];persist();render();},state.saved.includes(a.url)),button('有料だった',()=>{state.paid.push(a.url);persist();render();toast('記事を非表示にしました');if(confirm(`「${a.source}」の記事をすべて除外しますか？\nキャンセルすると、この記事だけを非表示にします。`)){state.blocked.push(a.source);persist();render();}}));
-  article.append(meta,link);
+  const heart=button(liked.has(a.url)?'♥':'♡',()=>{state.likes=toggleLike(state.likes,a);persist();render();},liked.has(a.url));heart.classList.add('heart');heart.setAttribute('aria-pressed',liked.has(a.url));heart.setAttribute('aria-label','ハート');heart.title='ハート';
+  actions.append(button(state.saved.includes(a.url)?'✓ 保存済み':'＋ あとで読む',()=>{state.saved=state.saved.includes(a.url)?state.saved.filter(x=>x!==a.url):[...state.saved,a.url];persist();render();},state.saved.includes(a.url)),button('有料だった',()=>{state.paid.push(a.url);persist();render();toast('記事を非表示にしました');if(confirm(`「${a.source}」の記事をすべて除外しますか？\nキャンセルすると、この記事だけを非表示にします。`)){state.blocked.push(a.source);persist();render();}}));
+  article.append(heart,meta,link);
   if(bodyUrls.has(a.url)){
    const snippet=document.createElement('p');snippet.className='match-snippet';const text=a.body||'',index=text.toLowerCase().indexOf(search),start=Math.max(0,index-35);
    const end=Math.min(text.length,index+search.length+65);
@@ -49,7 +49,7 @@ function render(){
   }
   article.append(actions);$('articles').append(article);
  }
- if(!items.length){const p=document.createElement('p');p.className='empty';p.textContent=view==='liked'&&!state.likes.length?'まだハートを付けた記事はありません。気に入った記事の「♡ ハート」を押すと、ここに集まり、おすすめ順にも反映されます。':'該当する記事がありません。検索条件や配信元の除外設定を変更してください。';$('articles').append(p);}
+ if(!items.length){const p=document.createElement('p');p.className='empty';p.textContent=view==='liked'&&!state.likes.length?'まだハートを付けた記事はありません。気に入った記事の「♡」を押すと、ここに集まり、おすすめ順にも反映されます。':'該当する記事がありません。検索条件や配信元の除外設定を変更してください。';$('articles').append(p);}
  $('more').hidden=items.length<=limit;
 }
 $('sort').value=state.sort;$('sort').addEventListener('change',()=>{state.sort=$('sort').value;persist();});
