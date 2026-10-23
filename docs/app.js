@@ -38,7 +38,9 @@ function render(){
   // Mark before the browser switches to the article's new tab.
   link.addEventListener('pointerup',event=>{if(event.button===0)markRead();});
   const actions=document.createElement('div');actions.className='actions';
-  const heart=button(liked.has(a.url)?'♥':'♡',()=>{state.likes=toggleLike(state.likes,a);persist();render();},liked.has(a.url));heart.classList.add('heart');heart.setAttribute('aria-pressed',liked.has(a.url));heart.setAttribute('aria-label','ハート');heart.title='ハート';
+  // 押しても並び替えずにハートの表示だけ変える。おすすめ順には次に一覧を表示したときに反映される。
+  const heart=button('',()=>{state.likes=toggleLike(state.likes,a);persist();showHeart(state.likes.some(l=>l.u===a.url));});heart.classList.add('heart');heart.setAttribute('aria-label','ハート');heart.title='ハート';
+  const showHeart=on=>{heart.textContent=on?'♥':'♡';heart.classList.toggle('active',on);heart.setAttribute('aria-pressed',on);};showHeart(liked.has(a.url));
   actions.append(button(state.saved.includes(a.url)?'✓ 保存済み':'＋ あとで読む',()=>{state.saved=state.saved.includes(a.url)?state.saved.filter(x=>x!==a.url):[...state.saved,a.url];persist();render();},state.saved.includes(a.url)),button('有料だった',()=>{state.paid.push(a.url);persist();render();toast('記事を非表示にしました');if(confirm(`「${a.source}」の記事をすべて除外しますか？\nキャンセルすると、この記事だけを非表示にします。`)){state.blocked.push(a.source);persist();render();}}));
   article.append(heart,meta,link);
   if(bodyUrls.has(a.url)){
