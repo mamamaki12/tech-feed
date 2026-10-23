@@ -1,5 +1,5 @@
 import {splitMatches} from './search.js';
-import {topicPatterns as patterns,recordClick,toggleLike,buildModel,interest,rankArticles,topInterests,featureLabel} from './rank.js';
+import {topicPatterns as patterns,recordClick,toggleLike,buildModel,rankArticles,topInterests,featureLabel} from './rank.js';
 const $=id=>document.getElementById(id);
 let state={read:[],saved:[],paid:[],blocked:[],excluded:'',clicks:[],likes:[],sort:'recommended'},data,limit=40,storageOK=true;
 try{const s=JSON.parse(localStorage.getItem('tech-feed-v1'));if(s){for(const k of ['read','saved','paid','blocked'])if(Array.isArray(s[k]))state[k]=s[k].filter(x=>typeof x==='string');if(typeof s.excluded==='string')state.excluded=s.excluded;if(Array.isArray(s.clicks))state.clicks=s.clicks.filter(c=>c&&typeof c.u==='string'&&Number.isFinite(c.t)&&Array.isArray(c.f));if(Array.isArray(s.likes))state.likes=s.likes.filter(l=>l&&typeof l.u==='string'&&typeof l.title==='string'&&typeof l.source==='string'&&Number.isFinite(l.t)&&Array.isArray(l.f));if(['recommended','newest'].includes(s.sort))state.sort=s.sort;}}catch{storageOK=false;}
@@ -27,7 +27,6 @@ function render(){
   }
   const article=document.createElement('article');article.className='article';article.classList.toggle('read',state.read.includes(a.url));
   const meta=document.createElement('div');meta.className='meta';const source=document.createElement('span');source.className='source';source.textContent=a.source;const time=document.createElement('time');time.dateTime=a.published;time.textContent=new Date(a.published).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});meta.append(source,time);
-  const reason=model&&interest(model,a).reason;if(reason){const tag=document.createElement('span');tag.className='reason';tag.textContent=`よく読む：${featureLabel(reason)}`;meta.append(tag);}
   const link=document.createElement('a');link.className='title';link.textContent=a.title;link.href=url.href;link.rel='noopener noreferrer';
   const markRead=()=>{
    if(!state.read.includes(a.url))state.read.push(a.url);
