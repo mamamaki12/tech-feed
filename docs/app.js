@@ -68,6 +68,21 @@ $('settings').onclick=()=>{
 };
 $('close').onclick=()=>$('dialog').close();$('excluded').oninput=()=>{state.excluded=$('excluded').value;persist();if(data)render();};
 $('reset').onclick=()=>{if(confirm('既読・閲覧履歴・ハート・保存・有料報告・除外設定をすべてリセットしますか？')){state={read:[],saved:[],paid:[],blocked:[],excluded:'',clicks:[],likes:[],sort:state.sort};persist();$('dialog').close();if(data)render();}};
-try{const res=await fetch('./articles.json',{cache:'no-cache'});if(!res.ok)throw new Error();data=await res.json();
+async function load(){
+ try{const res=await fetch('./articles.json',{cache:'no-cache'});if(!res.ok)throw new Error();data=await res.json();
  // 閲覧履歴の記録前に既読にした記事は、公開日時に開いたものとして履歴に取り込む。
- if(!state.clicks.length&&state.read.length){const read=new Set(state.read);for(const a of data.articles)if(read.has(a.url))state.clicks=recordClick(state.clicks,a,Math.min(Date.now(),Date.parse(a.published)));if(state.clicks.length){state.clicks.sort((x,y)=>x.t-y.t);persist();}}$('status').textContent=`${data.sources.filter(x=>x.ok).length}配信元から収集 · 最終更新 ${new Date(data.updatedAt).toLocaleString('ja-JP')}`;render();}catch{$('status').textContent='記事を取得できませんでした。時間をおいて再読み込みしてください。';}
+ if(!state.clicks.length&&state.read.length){const read=new Set(state.read);for(const a of data.articles)if(read.has(a.url))state.clicks=recordClick(state.clicks,a,Math.min(Date.now(),Date.parse(a.published)));if(state.clicks.length){state.clicks.sort((x,y)=>x.t-y.t);persist();}}$('status').textContent=`${data.sources.filter(x=>x.ok).length}配信元から収集 · 最終更新 ${new Date(data.updatedAt).toLocaleString('ja-JP')}`;limit=40;render();return true;}
+ catch{if(data)toast('記事を更新できませんでした。時間をおいてもう一度お試しください。');else $('status').textContent='記事を取得できませんでした。時間をおいて再読み込みしてください。';return false;}
+}
+// 画面の一番上で下に引っ張って離すと、記事を取り直して並べ直す（ホーム画面のアプリ表示ではブラウザ標準の更新が使えないため）。
+const pull={start:null,distance:0,busy:false},threshold=70;
+function showPull(text,distance){$('pull').textContent=text;$('pull').style.transform=`translate(-50%,${Math.min(distance,threshold+30)-50}px)`;$('pull').classList.toggle('visible',distance>0);}
+addEventListener('touchstart',event=>{pull.start=!pull.busy&&scrollY<=0&&event.touches.length===1&&!$('dialog').open?event.touches[0].clientY:null;pull.distance=0;},{passive:true});
+addEventListener('touchmove',event=>{if(pull.start===null)return;pull.distance=Math.max(0,(event.touches[0].clientY-pull.start)*0.5);if(scrollY>0)pull.distance=0;showPull(pull.distance>=threshold?'↻ 離すと更新':'↓ 引っ張って更新',pull.distance);},{passive:true});
+addEventListener('touchend',async()=>{
+ if(pull.start===null)return;pull.start=null;
+ if(pull.distance<threshold){showPull('',0);return;}
+ pull.busy=true;showPull('更新中…',threshold);const ok=await load();
+ showPull(ok?'更新しました':'更新できませんでした',threshold);setTimeout(()=>{showPull('',0);pull.busy=false;},700);
+});
+await load();
