@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {features,recordClick,toggleLike,buildModel,interest,rankArticles} from '../docs/rank.js';
+import {features,recordClick,toggleLike,buildModel,interest,score,rankArticles} from '../docs/rank.js';
 const now=Date.parse('2026-10-23T00:00:00Z'),hoursAgo=h=>new Date(now-h*3600000).toISOString();
 const article=(title,source,h)=>({title,source,url:`https://example.com/${encodeURIComponent(title)}`,published:hoursAgo(h)});
 test('Title features include source, topic and terms without stop words',()=>{
@@ -11,8 +11,8 @@ test('Without history the order is newest first',()=>{
  const items=[article('古い記事','A',30),article('新しい記事','B',1)];
  assert.deepEqual(rankArticles(items,buildModel(items,[],now)).map(a=>a.source),['B','A']);
 });
-test('Frequently opened topics outrank slightly newer articles, but not much older ones',()=>{
- const past=[1,2,3,4,5].map(i=>article(`Rustの所有権 ${i}`,'Zenn',100+i)),gadget=article('新型スマホ発売','PC Watch',1);
+test('With enough history, frequently opened topics outrank slightly newer articles, but not much older ones',()=>{
+ const past=Array.from({length:40},(_,i)=>article(`Rustの所有権 ${i}`,'Zenn',100+i)),gadget=article('新型スマホ発売','PC Watch',1);
  const rustFresh=article('Rust 2027の新機能','Zenn',6),rustOld=article('Rustの非同期処理','Zenn',24*10);
  let clicks=[];for(const a of past)clicks=recordClick(clicks,a,now-3600000);
  const articles=[...past,gadget,rustFresh,rustOld,...Array.from({length:30},(_,i)=>article(`クラウド記事 ${i}`,'AWS',200))];
@@ -39,4 +39,18 @@ test('A heart counts more than opening an article',()=>{
  const model=buildModel(articles,recordClick([],qiita,now),now,toggleLike([],zenn,now));
  const fresh=[article('新しいZenn記事','Zenn',3),article('新しいQiita記事','Qiita',3)];
  assert.ok(interest(model,fresh[0]).value>interest(model,fresh[1]).value);
+});
+test('A few opens barely change the order',()=>{
+ const past=[1,2,3].map(i=>article(`Rustの所有権 ${i}`,'Zenn',100+i)),gadget=article('新型スマホ発売','PC Watch',1),rust=article('Rust 2027の新機能','Zenn',3);
+ let clicks=[];for(const a of past)clicks=recordClick(clicks,a,now-3600000);
+ const articles=[...past,gadget,rust,...Array.from({length:30},(_,i)=>article(`クラウド記事 ${i}`,'AWS',200))];
+ assert.deepEqual(rankArticles([rust,gadget],buildModel(articles,clicks,now)),[gadget,rust]);
+});
+test('Every fourth slot comes from the newest articles',()=>{
+ const liked=Array.from({length:40},(_,i)=>article(`Rust ${i}`,'Zenn',1+i*0.1)),fresh=article('新着ニュース','PC Watch',0.5);
+ let clicks=[];for(const a of liked.slice(20))clicks=recordClick(clicks,a,now);
+ const others=Array.from({length:40},(_,i)=>article(`その他 ${i}`,'AWS',300)),model=buildModel([...liked,fresh,...others],clicks,now);
+ assert.ok(score(model,liked[0])>score(model,fresh));
+ const order=rankArticles([...liked.slice(0,20),fresh],model);
+ assert.equal(order.indexOf(fresh),3);
 });
