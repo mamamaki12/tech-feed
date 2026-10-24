@@ -1,5 +1,5 @@
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
-import {parseFeed} from './feed.mjs';
+import {feedText,parseFeed} from './feed.mjs';
 const sources=JSON.parse(await readFile(new URL('../sources.json',import.meta.url)));
 // One-time backfill supplements the short history available in normal RSS feeds.
 const backfill=process.argv.indexOf('--backfill');
@@ -10,6 +10,8 @@ if(backfill!==-1){
 }
 const path=new URL('../docs/articles.json',import.meta.url);
 let previous={articles:[]}; try{previous=JSON.parse(await readFile(path));}catch{}
+// 以前の取り込みで壊れたデータを直す：GIGAZINEのURLが「&#45;」の「#」以降で切れて「…/20261024&/」になったものは捨てて取り直し、題名に残った「&#8211;」などは文字に戻す。
+previous.articles=previous.articles.filter(a=>!/&\/?$/.test(new URL(a.url).pathname)).map(a=>/&(#\d+|#x[0-9a-f]+|amp|lt|gt|quot);/i.test(a.title)?{...a,title:feedText(a.title)}:a);
 const statuses=[]; const fresh=[];
 for(let i=0;i<sources.length;i+=5) await Promise.all(sources.slice(i,i+5).map(async source=>{
  try {

@@ -47,9 +47,12 @@ async function openReader(a){
  $('reader-title').textContent=entry.title||a.title;
  $('reader-meta').textContent=`${a.source} · ${new Date(a.published).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}`;
  $('reader-content').innerHTML=entry.content;$('reader-original').href=a.url;
+ reader.tidy($('reader-content'),entry.title||a.title);
  // 読了時間は日本語を1分500字として目安を出す。目次は見出しが2つ以上あるときだけ作る。
  $('reader-time').textContent=`約${Math.max(1,Math.round($('reader-content').textContent.replace(/\s+/g,'').length/500))}分で読めます`;
- const headings=[...$('reader-content').querySelectorAll('h2,h3')].filter(h=>h.textContent.trim());
+ // 目次は大見出し（h2）が2つ以上あればそれだけ、なければ小見出しも使い、長くなりすぎないよう15項目までにする。
+ const h2=[...$('reader-content').querySelectorAll('h2')].filter(h=>h.textContent.trim());
+ const headings=(h2.length>=2?h2:[...$('reader-content').querySelectorAll('h2,h3')].filter(h=>h.textContent.trim())).slice(0,15);
  $('reader-toc').replaceChildren();
  if(headings.length>=2){
   const label=document.createElement('b');label.textContent='目次';$('reader-toc').append(label);

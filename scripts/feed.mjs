@@ -1,5 +1,5 @@
 import { XMLParser } from 'fast-xml-parser';
-const parser = new XMLParser({ignoreAttributes:false,attributeNamePrefix:'@_'});
+const parser = new XMLParser({ignoreAttributes:false,attributeNamePrefix:'@_',htmlEntities:true});
 const list = x => x ? (Array.isArray(x) ? x : [x]) : [];
 const value = x => typeof x === 'object' ? x?.['#text'] || '' : x || '';
 export function feedText(raw){

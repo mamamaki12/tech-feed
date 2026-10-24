@@ -55,12 +55,78 @@ export function sanitize(html,base){
  clean(doc.body);
  return doc.body.innerHTML;
 }
-export function extract(html,url){
+// 表示時の後片付け。Readability が拾ってしまうサイトの部品（共有ボタン・著者欄・関連記事・著作権表示・メニュー）や空の箱、
+// 題名の重複、読み込めない画像・アイコン大の画像を取り除く。保存済みの記事にも効くよう、保存時ではなく表示時に行う。
+const junkText=/^(share|シェア|ツイート|tweet|specialpr|pr|広告|スポンサーリンク|sponsored|advertisement|ブックマーク|はてなブックマーク|印刷|print)$/i;
+const tailHeading=/^(この記事の著者|著者プロフィール|この記事を書いた人|関連記事|関連リンク|関連する記事|あわせて読みたい|合わせて読みたい|おすすめ記事|人気記事|related( articles| posts)?)$/i;
+export function tidy(root,title){
+ const text=el=>el.textContent.replace(/\s+/g,'').trim();
+ const hasMedia=el=>el.matches('img,pre,table,hr')||el.querySelector('img,pre,table,hr');
+ for(const el of [...root.querySelectorAll('p,div,li,h2,h3,h4,h5,h6')])if(root.contains(el)&&!hasMedia(el)&&junkText.test(text(el)))el.remove();
+ for(const h of [...root.querySelectorAll('h2,h3,h4,h5,h6')]){
+  if(!root.contains(h)||!tailHeading.test(text(h)))continue;
+  let next=h.nextElementSibling;h.remove();while(next){const after=next.nextElementSibling;next.remove();next=after;}
+ }
+ for(const p of [...root.querySelectorAll('p,div,small')]){
+  if(p.querySelector('p,div,img')||!/^(copyright|©|\(c\))/i.test(p.textContent.trim()))continue;
+  const rest=p.textContent.trim().replace(/^.*?(all rights reserved\.?|無断転載[^。]*。)/i,'').trim();
+  if(rest&&rest!==p.textContent.trim())p.textContent=rest;else if(p.textContent.length<300)p.remove();
+ }
+ // 本文より前にある、短いリンクだけが並ぶリストはサイトのメニューとみなす。
+ const firstBody=[...root.querySelectorAll('p')].find(p=>text(p).length>=40);
+ if(firstBody)for(const list of [...root.querySelectorAll('ul,ol')]){
+  if(!(list.compareDocumentPosition(firstBody)&Node.DOCUMENT_POSITION_FOLLOWING))continue;
+  const items=[...list.children];if(items.length>=3&&items.every(li=>text(li).length<=12&&li.querySelector('a')))list.remove();
+ }
+ const norm=s=>s.replace(/\s+/g,'');
+ const firstHeading=root.querySelector('h1,h2');
+ if(firstHeading&&norm(firstHeading.textContent)===norm(title||'')&&[...root.querySelectorAll('p')].filter(p=>p.compareDocumentPosition(firstHeading)&Node.DOCUMENT_POSITION_FOLLOWING).every(p=>!text(p)))firstHeading.remove();
+ const emptyBox='p,div,li,ul,ol,figure,figcaption,section,span,a,h2,h3,h4,h5,h6,blockquote,strong,b,em';
+ for(let changed=true;changed;){changed=false;for(const el of [...root.querySelectorAll(emptyBox)].reverse())if(!text(el)&&!el.querySelector('img,pre,table,hr,br')&&!el.matches('br')){el.remove();changed=true;}}
+ for(const img of root.querySelectorAll('img')){
+  const drop=()=>{const box=img.closest('figure');img.remove();if(box&&!text(box)&&!box.querySelector('img'))box.remove();};
+  img.addEventListener('error',drop,{once:true});
+  img.addEventListener('load',()=>{if(img.naturalWidth<40&&img.naturalHeight<40)drop();},{once:true});
+  if(img.complete)img.naturalWidth?(img.naturalWidth<40&&img.naturalHeight<40&&drop()):drop();
+ }
+}
+function readability(html,url,strict){
  const doc=new DOMParser().parseFromString(html,'text/html');
  const base=doc.createElement('base');base.href=url;doc.head.prepend(base);
- const article=new Readability(doc,{charThreshold:300}).parse();
+ const reader=new Readability(doc,{charThreshold:300});
+ if(!strict)reader._flags&=~reader.FLAG_CLEAN_CONDITIONALLY;
+ return reader.parse();
+}
+// Readability は、リンクや画像の多い箱ごと本文の段落を捨てることがある（GIGAZINEの冒頭の段落など）。
+// 箱ごとの掃除をしない版で取り出し直し、そちらにしかない「本文らしい段落」だけを、元の並び順の位置に戻す。
+// 本文らしい段落：40字以上・リンクの文字が1/4未満・リストの外・「題名｜サイト名」の形でない。戻す位置は、後ろにある本文の段落（40字以上）のうち最も近いものの前。後ろに本文が残っていない記事末尾の宣伝や関連記事は入れない。
+const leafSelector='p,li,h1,h2,h3,h4,h5,h6,figcaption,blockquote,pre,table,dt,dd';
+export function recoverParagraphs(strictHtml,looseHtml){
+ const parse=h=>new DOMParser().parseFromString(`<body>${h}</body>`,'text/html').body;
+ const norm=t=>t.replace(/\s+/g,'');
+ const leaves=root=>[...root.querySelectorAll(leafSelector)].filter(e=>!e.parentElement?.closest(leafSelector));
+ const strict=parse(strictHtml),loose=parse(looseHtml),strictText=norm(strict.textContent);
+ const isBody=e=>e.tagName==='P'&&norm(e.textContent).length>=40&&!/^(copyright|©)/i.test(e.textContent.trim());
+ const byText=new Map();for(const e of leaves(strict)){const t=norm(e.textContent);if(t&&isBody(e)&&!byText.has(t))byText.set(t,e);}
+ const looseLeaves=leaves(loose);let added=0;
+ looseLeaves.forEach((e,i)=>{
+  const t=norm(e.textContent);
+  if(e.tagName!=='P'||t.length<40||byText.has(t)||e.closest('ul,ol')||strictText.includes(t.slice(0,30))||/[|｜][^|｜]{2,30}$/.test(t))return;
+  const linkText=[...e.querySelectorAll('a')].reduce((n,a)=>n+norm(a.textContent).length,0);
+  if(linkText/t.length>=0.25)return;
+  const anchor=looseLeaves.slice(i+1).map(x=>byText.get(norm(x.textContent))).find(Boolean);
+  if(!anchor)return;
+  const copy=e.cloneNode(true);for(const img of copy.querySelectorAll('img'))img.remove();
+  anchor.before(copy);added++;
+ });
+ return added?strict.innerHTML:strictHtml;
+}
+export function extract(html,url){
+ const article=readability(html,url,true);
  if(!article?.content||article.length<200)return null;
- return {title:article.title,siteName:article.siteName,byline:article.byline,content:sanitize(article.content,url)};
+ const loose=readability(html,url,false);
+ const content=loose?.content?recoverParagraphs(article.content,loose.content):article.content;
+ return {title:article.title,siteName:article.siteName,byline:article.byline,content:sanitize(content,url)};
 }
 async function download(a){
  const res=await fetch(`${READER_PROXY}?url=${encodeURIComponent(a.url)}`);
