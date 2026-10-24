@@ -58,13 +58,14 @@ export function sanitize(html,base){
 // 表示時の後片付け。Readability が拾ってしまうサイトの部品（共有ボタン・著者欄・関連記事・著作権表示・メニュー）や空の箱、
 // 題名の重複、読み込めない画像・アイコン大の画像を取り除く。保存済みの記事にも効くよう、保存時ではなく表示時に行う。
 const junkText=/^(share|シェア|ツイート|tweet|specialpr|pr|広告|スポンサーリンク|sponsored|advertisement|ブックマーク|はてなブックマーク|印刷|print)$/i;
-const tailHeading=/^(この記事の著者|著者プロフィール|この記事を書いた人|関連記事|関連リンク|関連する記事|あわせて読みたい|合わせて読みたい|おすすめ記事|人気記事|related( articles| posts)?)$/i;
+const tailHeading=/^(この記事の著者|著者プロフィール|この記事を書いた人|関連記事|関連リンク|関連する記事|関連コンテンツ|あわせて読みたい|合わせて読みたい|おすすめ記事|人気記事|最新トピックス|specialインデックス|specialcontents|特別協賛|related( articles| posts)?)(pr)?$/i;
 export function tidy(root,title){
  const text=el=>el.textContent.replace(/\s+/g,'').trim();
  const hasMedia=el=>el.matches('img,pre,table,hr')||el.querySelector('img,pre,table,hr');
  for(const el of [...root.querySelectorAll('p,div,li,h2,h3,h4,h5,h6')])if(root.contains(el)&&!hasMedia(el)&&junkText.test(text(el)))el.remove();
- for(const h of [...root.querySelectorAll('h2,h3,h4,h5,h6')]){
-  if(!root.contains(h)||!tailHeading.test(text(h)))continue;
+ // 見出し（または見出し代わりの短い段落）が「関連記事」などなら、そこから後ろはサイトの部品とみなす。
+ for(const h of [...root.querySelectorAll('h2,h3,h4,h5,h6,p,div')]){
+  if(!root.contains(h)||h.querySelector('p,div,img')||!tailHeading.test(text(h).replace(/^[・■●▼]/,'')))continue;
   let next=h.nextElementSibling;h.remove();while(next){const after=next.nextElementSibling;next.remove();next=after;}
  }
  for(const p of [...root.querySelectorAll('p,div,small')]){
@@ -84,7 +85,8 @@ export function tidy(root,title){
  const emptyBox='p,div,li,ul,ol,figure,figcaption,section,span,a,h2,h3,h4,h5,h6,blockquote,strong,b,em';
  for(let changed=true;changed;){changed=false;for(const el of [...root.querySelectorAll(emptyBox)].reverse())if(!text(el)&&!el.querySelector('img,pre,table,hr,br')&&!el.matches('br')){el.remove();changed=true;}}
  for(const img of root.querySelectorAll('img')){
-  const drop=()=>{const box=img.closest('figure');img.remove();if(box&&!text(box)&&!box.querySelector('img'))box.remove();};
+  // 画像を消したら、空になった入れ物（リンク・段落・図など）も一緒に消す。
+  const drop=()=>{let box=img.parentElement;img.remove();while(box&&box!==root&&!text(box)&&!box.querySelector('img,pre,table,hr')){const up=box.parentElement;box.remove();box=up;}};
   img.addEventListener('error',drop,{once:true});
   img.addEventListener('load',()=>{if(img.naturalWidth<40&&img.naturalHeight<40)drop();},{once:true});
   if(img.complete)img.naturalWidth?(img.naturalWidth<40&&img.naturalHeight<40&&drop()):drop();
