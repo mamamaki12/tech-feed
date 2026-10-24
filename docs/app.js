@@ -2,7 +2,7 @@ import {splitMatches} from './search.js';
 import * as reader from './reader.js';
 import {topicPatterns as patterns,recordClick,toggleLike,buildModel,rankArticles,topInterests,featureLabel} from './rank.js';
 const $=id=>document.getElementById(id);
-const readerStyles=[['note','note風'],['tech','技術記事風（Zenn・Qiita風）'],['vertical','縦書き（Kindle風）']],themes=[['light','オフ'],['dark','オン'],['auto','端末に合わせる']];
+const readerStyles=[['note','note風'],['tech','技術記事風（Zenn・Qiita風）']],themes=[['light','オフ'],['dark','オン'],['auto','端末に合わせる']];
 let state={read:[],saved:[],paid:[],blocked:[],excluded:'',clicks:[],likes:[],sort:'recommended',readerStyle:'note',theme:'light'},data,limit=40,storageOK=true;
 try{const s=JSON.parse(localStorage.getItem('tech-feed-v1'));if(s){for(const k of ['read','saved','paid','blocked'])if(Array.isArray(s[k]))state[k]=s[k].filter(x=>typeof x==='string');if(typeof s.excluded==='string')state.excluded=s.excluded;if(Array.isArray(s.clicks))state.clicks=s.clicks.filter(c=>c&&typeof c.u==='string'&&Number.isFinite(c.t)&&Array.isArray(c.f));if(Array.isArray(s.likes))state.likes=s.likes.filter(l=>l&&typeof l.u==='string'&&typeof l.title==='string'&&typeof l.source==='string'&&Number.isFinite(l.t)&&Array.isArray(l.f));if(['recommended','newest'].includes(s.sort))state.sort=s.sort;if(readerStyles.some(([k])=>k===s.readerStyle))state.readerStyle=s.readerStyle;if(themes.some(([k])=>k===s.theme))state.theme=s.theme;}}catch{storageOK=false;}
 function toast(message){$('toast').textContent=message;$('toast').style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('toast').style.display='none',3500);}
@@ -33,8 +33,6 @@ function displayControls(container){
    input.type='radio';input.name=`${container.id}-${key}`;input.value=value;input.checked=state[key]===value;
    input.onchange=()=>{
     state[key]=value;persist();applyDisplay();
-    // 見た目を変えたら記事の先頭から表示し直す（縦書きは右端が先頭）。
-    if(key==='readerStyle'&&$('reader').open){$('reader').scrollTop=0;$('reader').querySelector('article').scrollLeft=0;}
    };
    item.append(input,label);choices.append(item);
   }
@@ -57,7 +55,7 @@ async function openReader(a){
   const label=document.createElement('b');label.textContent='目次';$('reader-toc').append(label);
   for(const h of headings){const b=document.createElement('button');b.textContent=h.textContent.trim();if(h.tagName==='H3')b.className='sub';b.onclick=()=>h.scrollIntoView({behavior:'smooth',block:'start',inline:'start'});$('reader-toc').append(b);}
  }
- applyDisplay();$('reader').showModal();$('reader').scrollTop=0;$('reader').querySelector('article').scrollLeft=0;history.pushState({reader:true},'');
+ applyDisplay();$('reader').showModal();$('reader').scrollTop=0;history.pushState({reader:true},'');
 }
 // スマホの「戻る」で一覧に戻れるよう、開いたときに履歴を1つ積む。
 addEventListener('popstate',()=>{if($('reader').open)$('reader').close();});
