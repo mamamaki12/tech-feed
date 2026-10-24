@@ -33,5 +33,7 @@ for(const a of byUrl){
 const articles=[...byTitle.values()].filter(a=>Date.parse(a.published)>=cutoff && Date.parse(a.published)<=Date.now()+86400000).sort((a,b)=>Date.parse(b.published)-Date.parse(a.published)).slice(0,20000);
 await mkdir(new URL('../docs/',import.meta.url),{recursive:true});
 await writeFile(path,JSON.stringify({updatedAt:new Date().toISOString(),sources:statuses.filter(s=>!s.backfill),articles}));
+// 本文の先読み（worker/）が取得してよいサイトの一覧。Googleニュースは元記事のURLが隠れているので除く。
+await writeFile(new URL('../docs/hosts.json',import.meta.url),JSON.stringify([...new Set(articles.map(a=>new URL(a.url).hostname))].filter(h=>h!=='news.google.com').sort()));
 console.log(`${articles.length} articles; ${statuses.filter(s=>s.ok).length}/${sources.length} sources OK`);
 for(const s of statuses.filter(s=>!s.ok)) console.log(`${s.name}: ${s.error}`);
