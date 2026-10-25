@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {features,recordClick,toggleLike,buildModel,interest,score,rankArticles} from '../docs/rank.js';
+import {features,recordClick,recordSeen,toggleLike,buildModel,interest,score,skipPenalty,rankArticles} from '../docs/rank.js';
 const now=Date.parse('2026-10-23T00:00:00Z'),hoursAgo=h=>new Date(now-h*3600000).toISOString();
 const article=(title,source,h)=>({title,source,url:`https://example.com/${encodeURIComponent(title)}`,published:hoursAgo(h)});
 test('Title features include source, topic and terms without stop words',()=>{
@@ -53,4 +53,30 @@ test('Every fourth slot comes from the newest articles',()=>{
  assert.ok(score(model,liked[0])>score(model,fresh));
  const order=rankArticles([...liked.slice(0,20),fresh],model);
  assert.equal(order.indexOf(fresh),3);
+});
+test('Seeing an article again within 30 minutes counts once',()=>{
+ const a=article('記事','A',1);let seen=recordSeen([],a,now);seen=recordSeen(seen,a,now+10*60000);assert.equal(seen[0].n,1);
+ seen=recordSeen(seen,a,now+40*60000);assert.equal(seen.length,1);assert.equal(seen[0].n,2);
+});
+test('An article shown repeatedly without a tap moves down, up to the read penalty',()=>{
+ const a=article('記事A','A',1),b=article('記事B','A',1.2);let seen=[];
+ for(let i=0;i<3;i++)seen=recordSeen(seen,a,now-i*3600000);
+ const model=buildModel([a,b],[],now,[],seen);
+ assert.deepEqual(rankArticles([a,b],model),[b,a]);
+ for(let i=3;i<20;i++)seen=recordSeen(seen,a,now-i*3600000);
+ const capped=buildModel([a,b],[],now,[],seen);
+ assert.ok(score(capped,b)-score(capped,a)<=Math.log(4)+0.01);
+});
+test('Often shown but rarely opened sources are lowered by share, not by how often they are shown',()=>{
+ const shown=[];let seen=[],clicks=[];
+ // A は40件表示して20件開く（好きで表示も多い）、B は40件表示して0件
+ for(let i=0;i<40;i++){const x=article(`A記事${i}`,'A',30+i),y=article(`B記事${i}`,'B',30+i);shown.push(x,y);seen=recordSeen(recordSeen(seen,x,now-3600000),y,now-3600000);if(i%2===0)clicks=recordClick(clicks,x,now-3600000);}
+ const model=buildModel(shown,clicks,now,[],seen),freshA=article('新しいA','A',1),freshB=article('新しいB','B',1);
+ assert.ok(skipPenalty(model,freshB)<-0.1);
+ assert.equal(skipPenalty(model,freshA),0);
+ assert.ok(skipPenalty(model,freshB)>=-Math.LN2);
+});
+test('Without enough records the skip penalty stays small',()=>{
+ const x=article('B記事','B',5);const model=buildModel([x],[],now,[],recordSeen([],x,now));
+ assert.ok(skipPenalty(model,article('新しいB','B',1))>-0.01);
 });
