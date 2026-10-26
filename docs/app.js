@@ -248,13 +248,27 @@ addEventListener('touchend',async()=>{
 // 新しい版が公開されていたら読み込み直す。ホーム画面のアプリは開きっぱなしになり、古い画面のまま使い続けてしまうことがあるため。
 // 同じ版のために読み込み直すのは1回だけにして、通信が遅く古い保存分が返ってきたときに繰り返さないようにする。
 const appVersion=new URL(import.meta.url).searchParams.get('v');
+async function latestVersion(){return (await (await fetch('./',{cache:'no-store'})).text()).match(/app\.js\?v=(\d+)/)?.[1];}
 async function checkUpdate(){
  try{
-  const latest=(await (await fetch('./',{cache:'no-store'})).text()).match(/app\.js\?v=(\d+)/)?.[1];
+  const latest=await latestVersion();
   if(!latest||!appVersion||latest===appVersion||sessionStorage.getItem('tech-feed-reloaded')===latest)return false;
   sessionStorage.setItem('tech-feed-reloaded',latest);location.reload();return true;
  }catch{return false;}
 }
+// 設定画面の「最新版を確認」。新しい版があれば、保存してある画面のファイルを消してから読み込み直す（記事の先読み・設定は消えない）。
+$('version').textContent=`バージョン ${appVersion||'不明'}`;
+$('update-check').onclick=async()=>{
+ const status=$('update-status');status.textContent='確認しています…';
+ try{
+  const latest=await latestVersion();
+  if(!latest)throw new Error();
+  if(latest===appVersion){status.textContent='最新の版です。';return;}
+  status.textContent=`バージョン ${latest} に更新します…`;
+  try{await caches.delete('tech-feed-v1');await (await navigator.serviceWorker?.getRegistration())?.update();}catch{}
+  sessionStorage.setItem('tech-feed-reloaded',latest);location.reload();
+ }catch{status.textContent='確認できませんでした。電波のよいところでもう一度お試しください。';}
+};
 let hiddenAt=0;
 document.addEventListener('visibilitychange',()=>{if(document.hidden)hiddenAt=Date.now();else if(Date.now()-hiddenAt>5*60000)checkUpdate();});
 await load();

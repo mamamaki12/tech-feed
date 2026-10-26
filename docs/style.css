@@ -98,3 +98,9 @@ main{padding:0 16px}
 /* タップで操作しているときは、ボタン・リンク・選択欄に自動で付く選択中の枠を出さない（ダイアログを開いた直後や閉じた後の自動の選択も含む）。Tab キーで操作したときは出す */
 [data-input=pointer] :is(button,a,select,summary,dialog,article,[tabindex]):focus-visible{outline:none}
 .close-x{border:0;background:transparent;font-size:26px;line-height:1;padding:4px 10px;color:inherit}.close-x:hover{background:transparent}
+/* iOS 26 はホーム画面アプリの上端の内容をぼかす。幅いっぱい・高さ10px超の固定の不透明な帯があると、ぼかさずにその色を使う */
+.top-band{position:fixed;top:0;left:0;right:0;height:12px;background:#f6f7f2;z-index:5;pointer-events:none}
+[data-theme=dark] .top-band{background:#121614}
+.about{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:20px;padding-top:14px;border-top:1px solid #dfe4da;font-size:12px;color:#67765d}
+.about button{font-size:12px;padding:6px 10px}
+[data-theme=dark] .about{border-color:#2c352f;color:#919d8e}
