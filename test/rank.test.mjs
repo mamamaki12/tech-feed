@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {features,recordClick,recordSeen,toggleLike,buildModel,interest,score,skipPenalty,rankArticles} from '../docs/rank.js';
+import {features,recordClick,recordSeen,toggleLike,buildModel,interest,score,skipPenalty,dislikePenalty,rankArticles} from '../docs/rank.js';
 const now=Date.parse('2026-10-23T00:00:00Z'),hoursAgo=h=>new Date(now-h*3600000).toISOString();
 const article=(title,source,h)=>({title,source,url:`https://example.com/${encodeURIComponent(title)}`,published:hoursAgo(h)});
 test('Title features include source, topic and terms without stop words',()=>{
@@ -79,4 +79,15 @@ test('Often shown but rarely opened sources are lowered by share, not by how oft
 test('Without enough records the skip penalty stays small',()=>{
  const x=article('B記事','B',5);const model=buildModel([x],[],now,[],recordSeen([],x,now));
  assert.ok(skipPenalty(model,article('新しいB','B',1))>-0.01);
+});
+test('Not interested lowers similar articles, gently at first and up to two days',()=>{
+ const gadgets=Array.from({length:6},(_,i)=>article(`新型スマホ ${i}`,'PC Watch',20+i)),others=Array.from({length:30},(_,i)=>article(`クラウド記事 ${i}`,'AWS',200));
+ const articles=[...gadgets,...others],freshGadget=article('新型スマホの話','PC Watch',1),freshOther=article('別の話題','Zenn',1);
+ const one=buildModel(articles,[],now,[],[],toggleLike([],gadgets[0],now));
+ assert.ok(dislikePenalty(one,freshGadget)<0&&dislikePenalty(one,freshGadget)>-0.3);
+ let many=[];for(const g of gadgets)many=toggleLike(many,g,now);
+ const strong=buildModel(articles,[],now,[],[],many);
+ assert.ok(dislikePenalty(strong,freshGadget)<dislikePenalty(one,freshGadget));
+ assert.ok(dislikePenalty(strong,freshGadget)>=-Math.log(4));
+ assert.equal(dislikePenalty(strong,freshOther),0);
 });
