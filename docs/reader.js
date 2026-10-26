@@ -131,7 +131,7 @@ export function extract(html,url){
  return {title:article.title,siteName:article.siteName,byline:article.byline,content:sanitize(content,url)};
 }
 async function download(a){
- const res=await fetch(`${READER_PROXY}?url=${encodeURIComponent(a.url)}`);
+ const res=await fetch(`${READER_PROXY}?url=${encodeURIComponent(a.url)}${a.feed?`&feed=${encodeURIComponent(a.feed)}`:''}`);
  // 有料記事・対象外のサイトなどは何度も取りに行かないよう「読めない」と記録する。通信エラーは次の機会に再挑戦する。
  if(!res.ok){if(res.status!==429&&res.status<500)await store('readwrite',s=>s.put({url:a.url,failed:true,savedAt:Date.now()}));unreadable.add(a.url);return;}
  const result=extract(decode(await res.arrayBuffer(),res.headers.get('Content-Type')),res.headers.get('X-Final-URL')||a.url);

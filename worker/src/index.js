@@ -45,19 +45,34 @@ async function handleFeed(target,cors,fetcher){
  }
  return json(200,feeds.length?{type:'links',feeds}:{type:'none'});
 }
+// ユーザーが追加したサイトの記事ページ（?url=記事&feed=そのRSS）。RSSをこちらで取り直し、記事のURLが本当に載っているときだけ取得する。
+// 自分で用意したRSSに好きなURLを書けば取得させられるので完全には防げないが、何でも取れる中継よりは悪用の手間が増える。
+async function listedInFeed(article,feed,fetcher){
+ if(privateHost(feed.hostname)||!['http:','https:'].includes(feed.protocol))return false;
+ let res;try{res=await fetcher(feed.href,{headers:{'User-Agent':UA,'Accept':'application/rss+xml, application/atom+xml, application/xml, text/xml'},redirect:'follow',cf:{cacheTtl:900,cacheEverything:true}});}catch{return false;}
+ if(!res.ok)return false;
+ const text=await readText(res);if(!text||!isFeedText(text))return false;
+ const body=text.replace(/&amp;/g,'&');
+ // アプリ側で utm_ などを外しているので、完全一致がなければクエリを除いた形でも探す（短すぎるパスは除く）。
+ const bare=article.origin+article.pathname;
+ return body.includes(article.href)||(article.pathname.length>=8&&body.includes(bare));
+}
 function reply(status,body,cors,extra={}){return new Response(body,{status,headers:{...cors,'Content-Type':'text/plain; charset=utf-8',...extra}});}
 export async function handle(request,fetcher=fetch){
  const origin=request.headers.get('Origin');
  const cors={'Access-Control-Allow-Origin':ORIGINS.includes(origin)?origin:SITE,'Access-Control-Expose-Headers':'X-Final-URL','Vary':'Origin'};
  if(request.method==='OPTIONS')return new Response(null,{status:204,headers:{...cors,'Access-Control-Allow-Methods':'GET'}});
  if(request.method!=='GET')return reply(405,'GET only',cors);
- const params=new URL(request.url).searchParams,isFeed=params.has('feed');
+ const params=new URL(request.url).searchParams,isFeed=params.has('feed')&&!params.has('url');
  let target;
  try{target=new URL(params.get(isFeed?'feed':'url'));}catch{return reply(400,'url is required',cors);}
  if(!['http:','https:'].includes(target.protocol))return reply(400,'http(s) only',cors);
  if(isFeed)return privateHost(target.hostname)?reply(403,'not allowed',cors):handleFeed(target,cors,fetcher);
  const allowed=await allowedHosts(fetcher);
- if(!allowed.has(target.hostname))return reply(403,'not a tech-feed article host',cors);
+ if(!allowed.has(target.hostname)){
+  let feed=null;try{feed=params.has('feed')?new URL(params.get('feed')):null;}catch{}
+  if(!feed||privateHost(target.hostname)||!(await listedInFeed(target,feed,fetcher)))return reply(403,'not a tech-feed article host',cors);
+ }
  let res;
  try{res=await fetcher(target.href,{headers:{'User-Agent':UA,'Accept':'text/html,application/xhtml+xml','Accept-Language':'ja,en;q=0.8'},redirect:'follow',cf:{cacheTtl:3600,cacheEverything:true}});}
  catch{return reply(502,'fetch failed',cors);}

@@ -47,3 +47,14 @@ test('Feed mode returns RSS from any site but not ordinary pages',async()=>{
  assert.equal((await handle(feedRequest('http://192.168.0.1/'),fetcher)).status,403);
  assert.equal((await handle(feedRequest('http://localhost/'),fetcher)).status,403);
 });
+test('Pages from added sites are relayed only when listed in the given feed',async()=>{
+ const rss='<?xml version="1.0"?><rss><channel><item><link>https://blog.example/posts/2026/hello?utm_source=rss&amp;x=1</link></item></channel></rss>';
+ const {fetcher,calls}=fakeFetch({'https://blog.example/rss':{body:rss,type:'application/rss+xml'},'https://blog.example/posts/2026/hello':{body:'<html>記事</html>',type:'text/html'},'https://evil.example/':{body:'<html>他人</html>',type:'text/html'}});
+ const req=(url,feed)=>new Request(`https://reader.example/?url=${encodeURIComponent(url)}&feed=${encodeURIComponent(feed)}`,{headers:{Origin:'https://mamamaki12.github.io'}});
+ const ok=await handle(req('https://blog.example/posts/2026/hello','https://blog.example/rss'),fetcher);
+ assert.equal(ok.status,200);assert.equal(await ok.text(),'<html>記事</html>');
+ assert.equal((await handle(req('https://evil.example/','https://blog.example/rss'),fetcher)).status,403);
+ assert.ok(!calls.includes('https://evil.example/'));
+ assert.equal((await handle(new Request(`https://reader.example/?url=${encodeURIComponent('https://blog.example/posts/2026/hello')}`),fetcher)).status,403);
+ assert.equal((await handle(req('http://192.168.0.1/posts/2026/hello','https://blog.example/rss'),fetcher)).status,403);
+});

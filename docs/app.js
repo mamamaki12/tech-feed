@@ -26,7 +26,7 @@ const readerReady=reader.init();
 // 表示中の未読の上位12件と「あとで読む」を先読みする。スクロールや絞り込みのたびに取り直さないよう少し待つ。
 function schedulePrefetch(items){
  clearTimeout(schedulePrefetch.timer);
- schedulePrefetch.timer=setTimeout(()=>readerReady.then(()=>{const read=new Set(state.read),saved=new Set(state.saved);reader.prefetch([...items.filter(a=>!a.custom&&!read.has(a.url)).slice(0,12),...data.articles.filter(a=>saved.has(a.url)).slice(0,30)]);}),1500);
+ schedulePrefetch.timer=setTimeout(()=>readerReady.then(()=>{const read=new Set(state.read),saved=new Set(state.saved);reader.prefetch([...items.filter(a=>!read.has(a.url)).slice(0,12),...data.articles.filter(a=>saved.has(a.url)).slice(0,30)]);}),1500);
 }
 // ダークモードと記事の見た目。ダークは「端末に合わせる」なら端末の設定が変わったときにも追従する。
 const darkQuery=matchMedia('(prefers-color-scheme: dark)');
@@ -150,7 +150,7 @@ $('sort').value=state.sort;$('sort').addEventListener('change',()=>{state.sort=$
 for(const id of ['search','topic','period','view','unread','sort'])$(id).addEventListener(id==='search'?'input':'change',()=>{limit=40;if(data)render();});
 $('more').onclick=()=>{limit+=40;render();};
 // ユーザーが追加したサイト。RSSは中継（worker/ の ?feed=）経由で取得し、記事はこのブラウザにだけ保存する（1サイト100件・30日まで）。
-// 追加したサイトの記事は先読み（オフライン表示）の対象外で、元のサイトで開く。
+// 追加したサイトの記事も先読みする。中継にはそのサイトのRSSも渡し、記事が本当に載っているかを中継側で確かめてもらう。
 const customKey='tech-feed-custom-v1',MAX_CUSTOM_SOURCES=20;
 let customCache={};try{customCache=JSON.parse(localStorage.getItem(customKey))||{};}catch{}
 function saveCustom(){try{localStorage.setItem(customKey,JSON.stringify(customCache));}catch{toast('追加したサイトの記事を保存できませんでした。');}}
@@ -176,7 +176,7 @@ async function refreshCustom(force){
 function mergeCustom(){
  if(!data)return;
  const own=data.articles.filter(a=>!a.custom),urls=new Set(own.map(a=>a.url));
- const extra=state.customSources.flatMap(s=>(customCache[s.feed]?.articles||[]).map(a=>({...a,source:s.name,custom:true}))).filter(a=>!urls.has(a.url));
+ const extra=state.customSources.flatMap(s=>(customCache[s.feed]?.articles||[]).map(a=>({...a,source:s.name,custom:true,feed:s.feed}))).filter(a=>!urls.has(a.url));
  data.articles=[...own,...extra].sort((x,y)=>Date.parse(y.published)-Date.parse(x.published));
 }
 async function addSource(){
