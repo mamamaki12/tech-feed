@@ -75,3 +75,17 @@ html{overscroll-behavior-y:contain}#pull{position:fixed;top:0;left:50%;transform
 [data-theme=dark] .display label:has(input:checked){border-color:#a9c97a;background:#2a3622}
 .reader article:focus{outline:none}
 .reader-bar :focus:not(:focus-visible){outline:none}
+/* スマホでは記事一覧までの距離を縮める：キャッチコピーを隠し、絞り込みを横1列にまとめる */
+@media(max-width:600px){
+header{padding:10px 16px}.brand{font-size:20px}header button{font-size:11px;padding:6px 10px}
+main{padding:0 16px}
+.intro{padding:8px 0 6px}.intro .eyebrow,.intro h1,.intro>p:not(.eyebrow){display:none}.intro small{font-size:10px}
+.controls{background:none;border:0;border-radius:0;padding:0}
+#search{padding:10px 12px;font-size:16px}
+.filters{flex-wrap:nowrap;overflow-x:auto;gap:6px;margin-top:8px;padding-bottom:2px;scrollbar-width:none}.filters::-webkit-scrollbar{display:none}
+.filters select{flex:none;padding:6px 8px;font-size:12px}.filters label{flex:none;white-space:nowrap;padding-right:4px}
+.list-heading{margin:8px 0 0;justify-content:flex-end}.list-heading h2{display:none}#count{font-size:11px}
+.article{padding:14px 2px}
+}
+[data-theme=dark] .controls{background:none}
+@media(min-width:601px){[data-theme=dark] .controls{background:#1b211d}}
