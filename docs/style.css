@@ -112,3 +112,6 @@ main{padding:0 16px}
 [data-theme=dark] #search::placeholder{color:#6f7a6c}
 @media(max-width:600px){#search{padding-left:40px;background-position:12px 50%}}
 @media(max-width:600px){[data-theme=dark] #search{background-position:12px 50%}}
+/* バージョン表示は設定画面の上（見出しの下）に置く */
+.about{margin:4px 0 0;padding:0 0 12px;border-top:0;border-bottom:1px solid #dfe4da}#update-status:empty{display:none}#update-status{margin:8px 0 0}
+[data-theme=dark] .about{border-bottom-color:#2c352f}
