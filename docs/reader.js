@@ -81,7 +81,9 @@ export function tidy(root,title){
  }
  const norm=s=>s.replace(/\s+/g,'');
  const firstHeading=root.querySelector('h1,h2');
- if(firstHeading&&norm(firstHeading.textContent)===norm(title||'')&&[...root.querySelectorAll('p')].filter(p=>p.compareDocumentPosition(firstHeading)&Node.DOCUMENT_POSITION_FOLLOWING).every(p=>!text(p)))firstHeading.remove();
+ // 題名と同じ見出し（題名に「| サイト名」が付いているだけの違いも含む）が本文の先頭にあれば消す。
+ const sameAsTitle=h=>{const t=norm(h.textContent),full=norm(title||'');return t===full||(t.length>=10&&full.startsWith(t));};
+ if(firstHeading&&sameAsTitle(firstHeading)&&[...root.querySelectorAll('p')].filter(p=>p.compareDocumentPosition(firstHeading)&Node.DOCUMENT_POSITION_FOLLOWING).every(p=>!text(p)))firstHeading.remove();
  const emptyBox='p,div,li,ul,ol,figure,figcaption,section,span,a,h2,h3,h4,h5,h6,blockquote,strong,b,em';
  for(let changed=true;changed;){changed=false;for(const el of [...root.querySelectorAll(emptyBox)].reverse())if(!text(el)&&!el.querySelector('img,pre,table,hr,br')&&!el.matches('br')){el.remove();changed=true;}}
  for(const img of root.querySelectorAll('img')){

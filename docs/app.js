@@ -58,10 +58,11 @@ $('display-close').onclick=()=>$('display-dialog').close();
 async function openReader(a){
  const entry=await reader.get(a.url).catch(()=>null);
  if(!entry?.content){location.href=a.url;return;}
- $('reader-title').textContent=entry.title||a.title;
+ // 題名は記事ページのもの（「| サイト名」などが付く）ではなく、一覧と同じRSSの題名を使う。
+ $('reader-title').textContent=a.title||entry.title;
  $('reader-meta').textContent=`${a.source} · ${new Date(a.published).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}`;
  $('reader-content').innerHTML=entry.content;$('reader-original').href=a.url;
- reader.tidy($('reader-content'),entry.title||a.title);
+ reader.tidy($('reader-content'),a.title||entry.title);
  // 読了時間は日本語を1分500字として目安を出す。目次は見出しが2つ以上あるときだけ作る。
  $('reader-time').textContent=`約${Math.max(1,Math.round($('reader-content').textContent.replace(/\s+/g,'').length/500))}分で読めます`;
  // 目次は大見出し（h2）が2つ以上あればそれだけ、なければ小見出しも使い、長くなりすぎないよう15項目までにする。

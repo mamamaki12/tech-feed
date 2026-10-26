@@ -12,7 +12,7 @@ html{overscroll-behavior-y:contain}#pull{position:fixed;top:0;left:50%;transform
 .reader-bar button{border:0;color:var(--r-fg);background:transparent}.reader-bar button:hover{background:transparent}
 .reader-back{font-size:22px;line-height:1;padding:6px 10px}.reader-style{margin-left:auto;font-size:15px;font-weight:700;padding:6px 10px}
 .reader-bar a{font-size:13px;color:var(--r-accent)}
-.reader article{max-width:620px;margin:auto;padding:26px 22px 70px;font-size:17px;line-height:2.1;letter-spacing:.04em;overflow-wrap:anywhere;background:var(--r-card)}
+.reader>article{max-width:620px;margin:auto;padding:26px 22px 70px;font-size:17px;line-height:2.1;letter-spacing:.04em;overflow-wrap:anywhere;background:var(--r-card)}
 .reader h1{font-size:24px;line-height:1.6;letter-spacing:.02em;margin:6px 0 14px;color:var(--r-fg)}
 .reader-meta{font-size:12px;color:var(--r-muted);font-weight:700;margin:0;letter-spacing:0}
 .reader-time{display:none}.reader-toc{display:none}
@@ -31,7 +31,7 @@ html{overscroll-behavior-y:contain}#pull{position:fixed;top:0;left:50%;transform
 #reader-content blockquote{margin:16px 0;padding:4px 16px;border-left:4px solid var(--r-border);color:var(--r-quote)}
 /* 技術記事風（Zenn・Qiita風） */
 .reader[data-style=tech]{--r-bg:#edf2f7;--r-fg:#1f2933;--r-muted:#65717b;--r-accent:#2b8de0;--r-border:#dbe4ee;--r-code-bg:#1e2a37;--r-code-fg:#e6edf3;--r-quote:#4b5866;--r-card:#fff;--r-inline:#eef1f4;--r-inline-fg:#c7254e}
-.reader[data-style=tech] article{max-width:720px;margin:14px auto 30px;padding:22px 18px 40px;border-radius:12px;font-size:16px;line-height:1.85;letter-spacing:0}
+.reader[data-style=tech]>article{max-width:720px;margin:14px auto 30px;padding:22px 18px 40px;border-radius:12px;font-size:16px;line-height:1.85;letter-spacing:0}
 .reader[data-style=tech] h1{font-size:23px;line-height:1.5}
 .reader[data-style=tech] .reader-time{display:inline-block;font-size:12px;background:color-mix(in srgb,var(--r-accent) 14%,transparent);color:var(--r-accent);border-radius:999px;padding:1px 9px;margin:0}
 .reader[data-style=tech] .reader-toc:not(:empty){display:block;font-size:13px;background:var(--r-bg);border-radius:8px;padding:10px 14px;margin-top:18px}
@@ -73,7 +73,7 @@ html{overscroll-behavior-y:contain}#pull{position:fixed;top:0;left:50%;transform
 [data-theme=dark] #toast,[data-theme=dark] #pull{background:#3a4d42}
 [data-theme=dark] .display label{border-color:#36413a}
 [data-theme=dark] .display label:has(input:checked){border-color:#a9c97a;background:#2a3622}
-.reader article:focus{outline:none}
+.reader>article:focus{outline:none}
 .reader-bar :focus:not(:focus-visible){outline:none}
 /* スマホでは記事一覧までの距離を縮める：キャッチコピーを隠し、絞り込みを横1列にまとめる */
 @media(max-width:600px){
