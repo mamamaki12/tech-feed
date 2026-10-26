@@ -1,10 +1,12 @@
 import {splitMatches} from './search.js';
 import * as reader from './reader.js';
+import {parseCustomFeed,feedTitle} from './feeds.js';
+import {READER_PROXY} from './config.js';
 import {topicPatterns as patterns,recordClick,recordSeen,toggleLike,buildModel,rankArticles,topInterests,topSkips,topDislikes,featureLabel} from './rank.js';
 const $=id=>document.getElementById(id);
 const readerStyles=[['note','note風'],['tech','技術記事風（Zenn・Qiita風）']],themes=[['light','オフ'],['dark','オン'],['auto','端末に合わせる']];
-let state={read:[],saved:[],paid:[],blocked:[],excluded:'',clicks:[],likes:[],dislikes:[],seen:[],sort:'recommended',readerStyle:'note',theme:'light'},data,limit=40,storageOK=true;
-try{const s=JSON.parse(localStorage.getItem('tech-feed-v1'));if(s){for(const k of ['read','saved','paid','blocked'])if(Array.isArray(s[k]))state[k]=s[k].filter(x=>typeof x==='string');if(typeof s.excluded==='string')state.excluded=s.excluded;if(Array.isArray(s.clicks))state.clicks=s.clicks.filter(c=>c&&typeof c.u==='string'&&Number.isFinite(c.t)&&Array.isArray(c.f));for(const k of ['likes','dislikes'])if(Array.isArray(s[k]))state[k]=s[k].filter(l=>l&&typeof l.u==='string'&&typeof l.title==='string'&&typeof l.source==='string'&&Number.isFinite(l.t)&&Array.isArray(l.f));if(Array.isArray(s.seen))state.seen=s.seen.filter(x=>x&&typeof x.u==='string'&&Number.isFinite(x.t)&&Array.isArray(x.f)&&Number.isFinite(x.n));if(['recommended','newest'].includes(s.sort))state.sort=s.sort;if(readerStyles.some(([k])=>k===s.readerStyle))state.readerStyle=s.readerStyle;if(themes.some(([k])=>k===s.theme))state.theme=s.theme;}}catch{storageOK=false;}
+let state={read:[],saved:[],paid:[],blocked:[],excluded:'',clicks:[],likes:[],dislikes:[],seen:[],customSources:[],sort:'recommended',readerStyle:'note',theme:'light'},data,limit=40,storageOK=true;
+try{const s=JSON.parse(localStorage.getItem('tech-feed-v1'));if(s){for(const k of ['read','saved','paid','blocked'])if(Array.isArray(s[k]))state[k]=s[k].filter(x=>typeof x==='string');if(typeof s.excluded==='string')state.excluded=s.excluded;if(Array.isArray(s.clicks))state.clicks=s.clicks.filter(c=>c&&typeof c.u==='string'&&Number.isFinite(c.t)&&Array.isArray(c.f));for(const k of ['likes','dislikes'])if(Array.isArray(s[k]))state[k]=s[k].filter(l=>l&&typeof l.u==='string'&&typeof l.title==='string'&&typeof l.source==='string'&&Number.isFinite(l.t)&&Array.isArray(l.f));if(Array.isArray(s.customSources))state.customSources=s.customSources.filter(x=>x&&typeof x.name==='string'&&typeof x.feed==='string');if(Array.isArray(s.seen))state.seen=s.seen.filter(x=>x&&typeof x.u==='string'&&Number.isFinite(x.t)&&Array.isArray(x.f)&&Number.isFinite(x.n));if(['recommended','newest'].includes(s.sort))state.sort=s.sort;if(readerStyles.some(([k])=>k===s.readerStyle))state.readerStyle=s.readerStyle;if(themes.some(([k])=>k===s.theme))state.theme=s.theme;}}catch{storageOK=false;}
 function toast(message){$('toast').textContent=message;$('toast').style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('toast').style.display='none',3500);}
 // 表示の記録はスクロールのたびに増えるので、まとめて2秒後に保存する。
 function persistSoon(){clearTimeout(persistSoon.timer);persistSoon.timer=setTimeout(persist,2000);}
@@ -24,7 +26,7 @@ const readerReady=reader.init();
 // 表示中の未読の上位12件と「あとで読む」を先読みする。スクロールや絞り込みのたびに取り直さないよう少し待つ。
 function schedulePrefetch(items){
  clearTimeout(schedulePrefetch.timer);
- schedulePrefetch.timer=setTimeout(()=>readerReady.then(()=>{const read=new Set(state.read),saved=new Set(state.saved);reader.prefetch([...items.filter(a=>!read.has(a.url)).slice(0,12),...data.articles.filter(a=>saved.has(a.url)).slice(0,30)]);}),1500);
+ schedulePrefetch.timer=setTimeout(()=>readerReady.then(()=>{const read=new Set(state.read),saved=new Set(state.saved);reader.prefetch([...items.filter(a=>!a.custom&&!read.has(a.url)).slice(0,12),...data.articles.filter(a=>saved.has(a.url)).slice(0,30)]);}),1500);
 }
 // ダークモードと記事の見た目。ダークは「端末に合わせる」なら端末の設定が変わったときにも追従する。
 const darkQuery=matchMedia('(prefers-color-scheme: dark)');
@@ -147,23 +149,86 @@ function render(){
 $('sort').value=state.sort;$('sort').addEventListener('change',()=>{state.sort=$('sort').value;persist();});
 for(const id of ['search','topic','period','view','unread','sort'])$(id).addEventListener(id==='search'?'input':'change',()=>{limit=40;if(data)render();});
 $('more').onclick=()=>{limit+=40;render();};
-$('settings').onclick=()=>{
+// ユーザーが追加したサイト。RSSは中継（worker/ の ?feed=）経由で取得し、記事はこのブラウザにだけ保存する（1サイト100件・30日まで）。
+// 追加したサイトの記事は先読み（オフライン表示）の対象外で、元のサイトで開く。
+const customKey='tech-feed-custom-v1',MAX_CUSTOM_SOURCES=20;
+let customCache={};try{customCache=JSON.parse(localStorage.getItem(customKey))||{};}catch{}
+function saveCustom(){try{localStorage.setItem(customKey,JSON.stringify(customCache));}catch{toast('追加したサイトの記事を保存できませんでした。');}}
+async function fetchFeed(url){const res=await fetch(`${READER_PROXY}?feed=${encodeURIComponent(url)}`);if(res.status>=500&&res.status!==502)throw new Error();return res.json();}
+function storeCustom(source,text,base){
+ const old=customCache[source.feed]?.articles||[],cutoff=Date.now()-30*86400000;
+ const fresh=parseCustomFeed(text,source.name,base).map(a=>({...a,body:a.body.slice(0,200)}));
+ const byUrl=new Map([...old,...fresh].map(a=>[a.url,a]));
+ const articles=[...byUrl.values()].filter(a=>Date.parse(a.published)>=cutoff).sort((x,y)=>Date.parse(y.published)-Date.parse(x.published)).slice(0,100);
+ customCache[source.feed]={fetchedAt:Date.now(),ok:true,articles};return fresh.length;
+}
+// force でなければ30分以内に取ったサイトは取り直さない。新着があったら true。
+async function refreshCustom(force){
+ if(!READER_PROXY)return false;let changed=false;
+ await Promise.all(state.customSources.map(async source=>{
+  const cached=customCache[source.feed];if(!force&&cached&&Date.now()-cached.fetchedAt<30*60000)return;
+  const before=cached?.articles?.length||0;
+  try{const res=await fetchFeed(source.feed);if(res.type!=='feed')throw new Error();storeCustom(source,res.text,res.url);if((customCache[source.feed].articles.length)!==before||!cached)changed=true;}
+  catch{customCache[source.feed]={...(cached||{articles:[]}),fetchedAt:Date.now(),ok:false};}
+ }));
+ saveCustom();return changed;
+}
+function mergeCustom(){
+ if(!data)return;
+ const own=data.articles.filter(a=>!a.custom),urls=new Set(own.map(a=>a.url));
+ const extra=state.customSources.flatMap(s=>(customCache[s.feed]?.articles||[]).map(a=>({...a,source:s.name,custom:true}))).filter(a=>!urls.has(a.url));
+ data.articles=[...own,...extra].sort((x,y)=>Date.parse(y.published)-Date.parse(x.published));
+}
+async function addSource(){
+ const status=$('source-status'),input=$('source-url').value.trim();
+ let url;try{url=new URL(/^https?:\/\//i.test(input)?input:`https://${input}`);}catch{status.textContent='URLを確認してください。';return;}
+ if(state.customSources.length>=MAX_CUSTOM_SOURCES){status.textContent=`追加できるのは${MAX_CUSTOM_SOURCES}サイトまでです。`;return;}
+ status.textContent='記事一覧（RSS）を探しています…';$('source-add').disabled=true;
+ try{
+  let res=await fetchFeed(url.href);
+  if(res.type==='links')res=await fetchFeed(res.feeds[0].url);
+  if(res.type==='error'){status.textContent=`サイトにつながりませんでした（${res.message||'エラー'}）。URLを確かめるか、時間をおいてお試しください。`;return;}
+  if(res.type!=='feed'){status.textContent='このサイトの記事一覧（RSS）が見つかりませんでした。RSSのURLを直接入れると追加できる場合があります。';return;}
+  if(state.customSources.some(s=>s.feed===res.url)){status.textContent='このサイトはすでに追加されています。';return;}
+  const names=new Set([...(data?.sources||[]).map(s=>s.name),...state.customSources.map(s=>s.name)]);
+  let name=feedTitle(res.text).slice(0,40)||url.hostname;if(names.has(name))name=`${name}（追加）`;
+  const source={name,feed:res.url,added:Date.now()};
+  const count=storeCustom(source,res.text,res.url);
+  if(!count){delete customCache[source.feed];status.textContent='記事一覧は見つかりましたが、記事を読み取れませんでした。';return;}
+  state.customSources=[...state.customSources,source];persist();saveCustom();mergeCustom();render();renderSources();
+  $('source-url').value='';status.textContent=`「${name}」を追加しました（${count}件）。`;
+ }catch{status.textContent='サイトを読み込めませんでした。時間をおいてもう一度お試しください。';}
+ finally{$('source-add').disabled=false;}
+}
+function removeSource(source){
+ if(!confirm(`「${source.name}」を削除しますか？`))return;
+ state.customSources=state.customSources.filter(s=>s.feed!==source.feed);delete customCache[source.feed];
+ persist();saveCustom();mergeCustom();render();renderSources();
+}
+$('source-add').onclick=addSource;$('source-url').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();addSource();}});
+function renderSources(){
  const sources=new Map((data?.sources||[]).map(s=>[s.name,{...s}]));
+ for(const s of state.customSources)sources.set(s.name,{name:s.name,ok:customCache[s.feed]?.ok!==false,custom:s});
  for(const a of data?.articles||[]){if(!sources.has(a.source))sources.set(a.source,{name:a.source,ok:true,count:0});}
  for(const name of state.blocked){if(!sources.has(name))sources.set(name,{name,ok:true,count:0});}
  for(const s of sources.values())s.count=(data?.articles||[]).filter(a=>a.source===s.name).length;
- $('sources').replaceChildren();for(const s of sources.values()){const label=document.createElement('label'),check=document.createElement('input'),name=document.createElement('span'),status=document.createElement('small');check.type='checkbox';check.checked=!state.blocked.includes(s.name);check.onchange=()=>{state.blocked=state.blocked.filter(x=>x!==s.name);if(!check.checked)state.blocked.push(s.name);persist();render();};name.textContent=s.name;status.textContent=s.ok?`${s.count}件掲載`:'取得失敗';label.append(check,name,status);$('sources').append(label);}
+ $('sources').replaceChildren();for(const s of sources.values()){const label=document.createElement('label'),check=document.createElement('input'),name=document.createElement('span'),status=document.createElement('small');check.type='checkbox';check.checked=!state.blocked.includes(s.name);check.onchange=()=>{state.blocked=state.blocked.filter(x=>x!==s.name);if(!check.checked)state.blocked.push(s.name);persist();render();};name.textContent=s.name;status.textContent=(s.custom?'追加したサイト · ':'')+(s.ok?`${s.count}件掲載`:'取得失敗');label.append(check,name,status);
+  if(s.custom){const remove=button('削除',event=>{event.preventDefault();removeSource(s.custom);});remove.className='remove-source';label.append(remove);}
+  $('sources').append(label);}
+}
+$('settings').onclick=()=>{
+ renderSources();$('add-source').hidden=!READER_PROXY;$('source-status').textContent='';
  const model=buildModel(data?.articles||[],state.clicks,Date.now(),state.likes,state.seen,state.dislikes),tops=topInterests(model),skips=topSkips(model),dislikes=topDislikes(model);
  $('interests').textContent=(tops.length?`よく開く傾向：${tops.map(([f])=>featureLabel(f)).join('、')}`:'記事を開いたりハートを付けたりすると、好みの配信元・分野・キーワードを学習して「おすすめ順」に反映します。')+(dislikes.length?`\n興味なしが多い：${dislikes.map(([f])=>featureLabel(f)).join('、')}`:'')+(skips.length?`\nあまり開かない傾向：${skips.map(([f])=>featureLabel(f)).join('、')}`:'');
  displayControls($('display'));
  $('excluded').value=state.excluded;$('storage').textContent=storageOK?'設定はこのブラウザに保存されます。':'ブラウザへの保存が利用できません。';$('dialog').showModal();
 };
 $('close').onclick=()=>$('dialog').close();$('excluded').oninput=()=>{state.excluded=$('excluded').value;persist();if(data)render();};
-$('reset').onclick=()=>{if(confirm('既読・閲覧履歴・表示の記録・ハート・興味なし・保存・有料報告・除外設定をすべてリセットしますか？')){state={read:[],saved:[],paid:[],blocked:[],excluded:'',clicks:[],likes:[],dislikes:[],seen:[],sort:state.sort,readerStyle:state.readerStyle,theme:state.theme};persist();$('dialog').close();if(data)render();}};
+$('reset').onclick=()=>{if(confirm('既読・閲覧履歴・表示の記録・ハート・興味なし・保存・有料報告・除外設定・追加したサイトをすべてリセットしますか？')){customCache={};saveCustom();state={read:[],saved:[],paid:[],blocked:[],excluded:'',clicks:[],likes:[],dislikes:[],seen:[],customSources:[],sort:state.sort,readerStyle:state.readerStyle,theme:state.theme};persist();$('dialog').close();if(data)render();}};
 async function load(){
  try{const res=await fetch('./articles.json',{cache:'no-cache'});if(!res.ok)throw new Error();data=await res.json();
  // 閲覧履歴の記録前に既読にした記事は、公開日時に開いたものとして履歴に取り込む。
- if(!state.clicks.length&&state.read.length){const read=new Set(state.read);for(const a of data.articles)if(read.has(a.url))state.clicks=recordClick(state.clicks,a,Math.min(Date.now(),Date.parse(a.published)));if(state.clicks.length){state.clicks.sort((x,y)=>x.t-y.t);persist();}}$('status').textContent=`${data.sources.filter(x=>x.ok).length}配信元から収集 · 最終更新 ${new Date(data.updatedAt).toLocaleString('ja-JP')}`;limit=40;render();return true;}
+ if(!state.clicks.length&&state.read.length){const read=new Set(state.read);for(const a of data.articles)if(read.has(a.url))state.clicks=recordClick(state.clicks,a,Math.min(Date.now(),Date.parse(a.published)));if(state.clicks.length){state.clicks.sort((x,y)=>x.t-y.t);persist();}}$('status').textContent=`${data.sources.filter(x=>x.ok).length}配信元から収集 · 最終更新 ${new Date(data.updatedAt).toLocaleString('ja-JP')}`;mergeCustom();limit=40;render();return true;}
  catch{if(data)toast('記事を更新できませんでした。時間をおいてもう一度お試しください。');else $('status').textContent='記事を取得できませんでした。時間をおいて再読み込みしてください。';return false;}
 }
 // 画面の一番上で下に引っ張って離すと、記事を取り直して並べ直す（ホーム画面のアプリ表示ではブラウザ標準の更新が使えないため）。
@@ -176,6 +241,7 @@ addEventListener('touchend',async()=>{
  if(pull.distance<threshold){showPull('',0);return;}
  pull.busy=true;showPull('更新中…',threshold);
  if(await checkUpdate())return;
+ await refreshCustom(true);
  const ok=await load();
  showPull(ok?'更新しました':'更新できませんでした',threshold);setTimeout(()=>{showPull('',0);pull.busy=false;},700);
 });
@@ -193,4 +259,6 @@ let hiddenAt=0;
 document.addEventListener('visibilitychange',()=>{if(document.hidden)hiddenAt=Date.now();else if(Date.now()-hiddenAt>5*60000)checkUpdate();});
 await load();
 checkUpdate();
+// 追加したサイトの新着は裏で取り、一覧の上のほうを見ているときだけ並べ直す（読んでいる途中で一覧が動かないように）。
+refreshCustom(false).then(changed=>{if(changed){mergeCustom();if(scrollY<200)render();}});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});

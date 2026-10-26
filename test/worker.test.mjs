@@ -33,3 +33,17 @@ test('Unknown origins get the site origin, not their own',async()=>{
  const res=await handle(request('https://www.itmedia.co.jp/b','https://other.example'),fetcher);
  assert.equal(res.headers.get('Access-Control-Allow-Origin'),'https://mamamaki12.github.io');
 });
+const feedRequest=url=>new Request(`https://reader.example/?feed=${encodeURIComponent(url)}`,{headers:{Origin:'https://mamamaki12.github.io'}});
+test('Feed mode returns RSS from any site but not ordinary pages',async()=>{
+ const rss='<?xml version="1.0"?><rss><channel><title>ブログ</title></channel></rss>';
+ const html='<html><head><link rel="alternate" type="application/rss+xml" title="RSS" href="/index.rdf"></head><body>本文</body></html>';
+ const {fetcher}=fakeFetch({'https://blog.example/rss':{body:rss,type:'application/rss+xml'},'https://blog.example/':{body:html,type:'text/html'},'https://plain.example/':{body:'<html>ただのページ</html>',type:'text/html'}});
+ const a=await (await handle(feedRequest('https://blog.example/rss'),fetcher)).json();
+ assert.equal(a.type,'feed');assert.equal(a.text,rss);
+ const b=await (await handle(feedRequest('https://blog.example/'),fetcher)).json();
+ assert.deepEqual(b,{type:'links',feeds:[{url:'https://blog.example/index.rdf',title:'RSS'}]});
+ const c=await (await handle(feedRequest('https://plain.example/'),fetcher)).json();
+ assert.equal(c.type,'none');assert.ok(!JSON.stringify(c).includes('ただのページ'));
+ assert.equal((await handle(feedRequest('http://192.168.0.1/'),fetcher)).status,403);
+ assert.equal((await handle(feedRequest('http://localhost/'),fetcher)).status,403);
+});

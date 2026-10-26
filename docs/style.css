@@ -91,3 +91,7 @@ main{padding:0 16px}
 @media(min-width:601px){[data-theme=dark] .controls{background:#1b211d}}
 .article.dismissed{padding:10px 2px}.dismissed-note{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0;font-size:12px;color:#788373}.dismissed-note button{font-size:11px;padding:5px 10px;flex:none}
 [data-theme=dark] .dismissed-note{color:#919d8e}
+.add-source{margin:18px 0;padding:12px;border:1px solid #d8dfd3;border-radius:10px}.add-source[hidden]{display:none}.add-source label{font-size:13px;font-weight:700}.add-source p{margin:6px 0}
+.add-row{display:flex;gap:8px}.add-row input{flex:1;min-width:0;padding:9px 10px;font-size:16px;border:1px solid #d8dfd3;border-radius:8px;background:#fff;color:inherit}.add-row button{flex:none}
+#sources .remove-source{font-size:11px;padding:4px 8px;margin-left:6px}
+[data-theme=dark] .add-source{border-color:#36413a}[data-theme=dark] .add-row input{background:#242c26;border-color:#36413a}
