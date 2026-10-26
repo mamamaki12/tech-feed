@@ -74,3 +74,4 @@ html{overscroll-behavior-y:contain}#pull{position:fixed;top:0;left:50%;transform
 [data-theme=dark] .display label{border-color:#36413a}
 [data-theme=dark] .display label:has(input:checked){border-color:#a9c97a;background:#2a3622}
 .reader article:focus{outline:none}
+.reader-bar :focus:not(:focus-visible){outline:none}

@@ -70,7 +70,9 @@ async function openReader(a){
   const label=document.createElement('b');label.textContent='目次';$('reader-toc').append(label);
   for(const h of headings){const b=document.createElement('button');b.textContent=h.textContent.trim();if(h.tagName==='H3')b.className='sub';b.onclick=()=>h.scrollIntoView({behavior:'smooth',block:'start',inline:'start'});$('reader-toc').append(b);}
  }
- applyDisplay();$('reader').showModal();$('reader').scrollTop=0;history.pushState({reader:true},'');
+ applyDisplay();$('reader').showModal();$('reader').scrollTop=0;
+ // iPhone の Safari は開いた直後に先頭のボタンを選択して枠を出すので、本文に選択を移す。
+ $('reader').querySelector('article').focus({preventScroll:true});history.pushState({reader:true},'');
 }
 // スマホの「戻る」で一覧に戻れるよう、開いたときに履歴を1つ積む。
 addEventListener('popstate',()=>{if($('reader').open)$('reader').close();});
@@ -162,8 +164,23 @@ addEventListener('touchmove',event=>{if(pull.start===null)return;pull.distance=M
 addEventListener('touchend',async()=>{
  if(pull.start===null)return;pull.start=null;
  if(pull.distance<threshold){showPull('',0);return;}
- pull.busy=true;showPull('更新中…',threshold);const ok=await load();
+ pull.busy=true;showPull('更新中…',threshold);
+ if(await checkUpdate())return;
+ const ok=await load();
  showPull(ok?'更新しました':'更新できませんでした',threshold);setTimeout(()=>{showPull('',0);pull.busy=false;},700);
 });
+// 新しい版が公開されていたら読み込み直す。ホーム画面のアプリは開きっぱなしになり、古い画面のまま使い続けてしまうことがあるため。
+// 同じ版のために読み込み直すのは1回だけにして、通信が遅く古い保存分が返ってきたときに繰り返さないようにする。
+const appVersion=new URL(import.meta.url).searchParams.get('v');
+async function checkUpdate(){
+ try{
+  const latest=(await (await fetch('./',{cache:'no-store'})).text()).match(/app\.js\?v=(\d+)/)?.[1];
+  if(!latest||!appVersion||latest===appVersion||sessionStorage.getItem('tech-feed-reloaded')===latest)return false;
+  sessionStorage.setItem('tech-feed-reloaded',latest);location.reload();return true;
+ }catch{return false;}
+}
+let hiddenAt=0;
+document.addEventListener('visibilitychange',()=>{if(document.hidden)hiddenAt=Date.now();else if(Date.now()-hiddenAt>5*60000)checkUpdate();});
 await load();
+checkUpdate();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
