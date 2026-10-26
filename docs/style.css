@@ -73,3 +73,4 @@ html{overscroll-behavior-y:contain}#pull{position:fixed;top:0;left:50%;transform
 [data-theme=dark] #toast,[data-theme=dark] #pull{background:#3a4d42}
 [data-theme=dark] .display label{border-color:#36413a}
 [data-theme=dark] .display label:has(input:checked){border-color:#a9c97a;background:#2a3622}
+.reader article:focus{outline:none}
