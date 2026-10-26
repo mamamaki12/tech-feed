@@ -58,3 +58,11 @@ test('Pages from added sites are relayed only when listed in the given feed',asy
  assert.equal((await handle(new Request(`https://reader.example/?url=${encodeURIComponent('https://blog.example/posts/2026/hello')}`),fetcher)).status,403);
  assert.equal((await handle(req('http://192.168.0.1/posts/2026/hello','https://blog.example/rss'),fetcher)).status,403);
 });
+test('A page is not accepted just because a listed URL starts with it',async()=>{
+ const rss='<?xml version="1.0"?><rss><channel><item><link>https://blog.example/posts/2026/hello</link></item></channel></rss>';
+ const {fetcher}=fakeFetch({'https://blog.example/rss':{body:rss,type:'application/rss+xml'},'https://blog.example/':{body:'<html>top</html>',type:'text/html'},'https://blog.example/posts/2026/hello/':{body:'<html>記事</html>',type:'text/html'}});
+ const req=(url)=>new Request(`https://reader.example/?url=${encodeURIComponent(url)}&feed=${encodeURIComponent('https://blog.example/rss')}`);
+ assert.equal((await handle(req('https://blog.example/'),fetcher)).status,403);
+ assert.equal((await handle(req('https://blog.example/posts/'),fetcher)).status,403);
+ assert.equal((await handle(req('https://blog.example/posts/2026/hello/'),fetcher)).status,403);
+});

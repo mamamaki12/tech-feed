@@ -54,8 +54,9 @@ async function listedInFeed(article,feed,fetcher){
  const text=await readText(res);if(!text||!isFeedText(text))return false;
  const body=text.replace(/&amp;/g,'&');
  // アプリ側で utm_ などを外しているので、完全一致がなければクエリを除いた形でも探す（短すぎるパスは除く）。
- const bare=article.origin+article.pathname;
- return body.includes(article.href)||(article.pathname.length>=8&&body.includes(bare));
+ // URLの途中で一致しただけ（トップページが各記事URLの先頭に含まれる、など）では認めず、URLの終わりまで一致したときだけ認める。
+ const listed=url=>new RegExp(url.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?=/?(["\'<\\s?#&]|$))').test(body);
+ return listed(article.href)||(article.pathname.length>=8&&listed(article.origin+article.pathname));
 }
 function reply(status,body,cors,extra={}){return new Response(body,{status,headers:{...cors,'Content-Type':'text/plain; charset=utf-8',...extra}});}
 export async function handle(request,fetcher=fetch){
