@@ -95,3 +95,6 @@ main{padding:0 16px}
 .add-row{display:flex;gap:8px}.add-row input{flex:1;min-width:0;padding:9px 10px;font-size:16px;border:1px solid #d8dfd3;border-radius:8px;background:#fff;color:inherit}.add-row button{flex:none}
 #sources .remove-source{font-size:11px;padding:4px 8px;margin-left:6px}
 [data-theme=dark] .add-source{border-color:#36413a}[data-theme=dark] .add-row input{background:#242c26;border-color:#36413a}
+/* タップで操作しているときは、ボタン・リンク・選択欄に自動で付く選択中の枠を出さない（ダイアログを開いた直後や閉じた後の自動の選択も含む）。Tab キーで操作したときは出す */
+[data-input=pointer] :is(button,a,select,summary,dialog,article,[tabindex]):focus-visible{outline:none}
+.close-x{border:0;background:transparent;font-size:26px;line-height:1;padding:4px 10px;color:inherit}.close-x:hover{background:transparent}
