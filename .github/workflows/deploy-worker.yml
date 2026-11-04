@@ -4,6 +4,9 @@ on:
     branches: [main]
     paths: ['worker/**', '.github/workflows/deploy-worker.yml']
   workflow_dispatch:
+# 公開に使うのは Cloudflare の秘密の値だけ。リポジトリへの書き込み権限は渡さない。
+permissions:
+  contents: read
 jobs:
   deploy:
     runs-on: ubuntu-latest
