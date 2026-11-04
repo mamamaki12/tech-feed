@@ -83,3 +83,9 @@ RSS公開は無制限の再利用許可を意味しません。公開運用時�
 
 `worker/` を変えたプルリクエストを main にマージすると、Actions の「Deploy reader worker」が自動で公開し直します（Secrets が登録済みの場合）。動かなかったときは Actions → Deploy reader worker → Run workflow で手動実行するか、手元で `cd worker && npm ci && npx wrangler deploy` を実行します。
 
+## 安全のための設定
+
+- 記事画面には他サイトの本文を入れるため、`docs/reader.js` の `sanitize` で決まったタグと属性（リンク・画像・表の結合）だけを残し、さらに `docs/index.html` の Content-Security-Policy で、万一入り込んだスクリプトも動かないようにしています。このドメイン（`mamamaki12.github.io`）は他のアプリと保存場所を共有しているので、ここが破られると他のアプリのデータにも届きます
+- `index.html` の `<script>` を書き換えたら、CSP の `script-src` のハッシュも書き換えます（`npm test` が正しい値を表示します）。`onclick="…"` のような属性は CSP で止まるので使いません
+- CSP は本文の取り出し（DOMParser）にも効きます。`base-uri` を `'self'` にすると記事内のリンク・画像のURLがアプリ側になり、`style-src` から `'unsafe-inline'` を外すと隠れた部分（`display:none`）を見分けられなくなるので、どちらもしません
+- `test/browser.test.mjs` は Playwright がある環境でだけブラウザで確かめます（記事収集の Actions では飛ばします）
