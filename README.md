@@ -66,6 +66,8 @@ RSS公開は無制限の再利用許可を意味しません。公開運用時�
 - 追加したサイトの記事ページは `?url=記事&feed=RSS` で取得します。中継がRSSを取り直し、記事のURLが載っているときだけ取得します（自作のRSSに好きなURLを書けば取得させられるため完全な対策ではありませんが、何でも取れる中継よりは悪用しにくくしています）
 - ユーザーが追加したサイトのRSSは `?feed=URL` で取得します。どのサイトでも取得できますが、返すのはRSS/Atomの本文と、サイトのページから見つけたRSSの場所だけで、普通のページは中継しません（自分のネットワーク内のアドレスは拒否）
 - 中継は `docs/hosts.json`（収集時に生成）に載っているサイトだけを取得します。Googleニュース経由の記事は元のURLが分からないため対象外で、これまでどおり配信元サイトで開きます
+- 中継が返すページには、ブラウザで直接開かれてもスクリプトやフォームが動かない指定（`Content-Security-Policy: sandbox`）を付けます。自作のRSSを使って、中継のドメインに偽のページを置かれないようにするためです。アプリは `fetch` で中身を読むだけなので影響しません
+- 中継しないもの：HTML以外（`text/html`・`application/xhtml+xml` で始まらないもの）、5MBを超えるページ（RSSは3MB。分割して送られてきても数える）、自分のネットワーク内のアドレス（転送された先も確かめる）。失敗した結果はブラウザに残さないので、すぐに試し直せます
 - 取得した本文は14日・300件までブラウザ内（IndexedDB）に保存します。サーバーには保存しません。会員限定・有料記事は、ページに公開されている部分しか表示されません
 - 画像は保存しないため、電波がないと表示されません
 
@@ -76,3 +78,14 @@ RSS公開は無制限の再利用許可を意味しません。公開運用時�
 3. GitHub のリポジトリ → Settings → Secrets and variables → Actions に `CLOUDFLARE_API_TOKEN` と `CLOUDFLARE_ACCOUNT_ID` を登録
 4. Actions の「Deploy reader worker」を手動実行すると `https://tech-feed-reader.<サブドメイン>.workers.dev` に公開される
 5. そのURLを `docs/config.js` の `READER_PROXY` に書いて push すると先読みが有効になる
+
+### 中継を直したとき
+
+`worker/` を変えたプルリクエストを main にマージすると、Actions の「Deploy reader worker」が自動で公開し直します（Secrets が登録済みの場合）。動かなかったときは Actions → Deploy reader worker → Run workflow で手動実行するか、手元で `cd worker && npm ci && npx wrangler deploy` を実行します。
+
+## 安全のための設定
+
+- 記事画面には他サイトの本文を入れるため、`docs/reader.js` の `sanitize` で決まったタグと属性（リンク・画像・表の結合）だけを残し、さらに `docs/index.html` の Content-Security-Policy で、万一入り込んだスクリプトも動かないようにしています。このドメイン（`mamamaki12.github.io`）は他のアプリと保存場所を共有しているので、ここが破られると他のアプリのデータにも届きます
+- `index.html` の `<script>` を書き換えたら、CSP の `script-src` のハッシュも書き換えます（`npm test` が正しい値を表示します）。`onclick="…"` のような属性は CSP で止まるので使いません
+- CSP は本文の取り出し（DOMParser）にも効きます。`base-uri` を `'self'` にすると記事内のリンク・画像のURLがアプリ側になり、`style-src` から `'unsafe-inline'` を外すと隠れた部分（`display:none`）を見分けられなくなるので、どちらもしません
+- `test/browser.test.mjs` は Playwright がある環境でだけブラウザで確かめます（記事収集の Actions では飛ばします）
