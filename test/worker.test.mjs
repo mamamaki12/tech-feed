@@ -1,6 +1,8 @@
 import {test,beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
-import {handle,resetHosts} from '../worker/src/index.js';
+import {handle as relay,resetHosts,ARTICLE_RELAY} from '../worker/src/index.js';
+// 記事ページの中継は公開版では止めている。止める前と同じ守りが効くかは、オンにして確かめる。
+const handle=(request,fetcher)=>relay(request,fetcher,{articles:true});
 const hostsUrl='https://mamamaki12.github.io/tech-feed/hosts.json';
 function fakeFetch(pages){
  const calls=[];
@@ -113,4 +115,13 @@ test('Local network names and redirects into them are refused',async()=>{
  const redirected=async(url)=>{const res=new Response('<rss><channel><item><link>http://10.0.0.5/admin</link></item></channel></rss>',{headers:{'Content-Type':'application/rss+xml'}});Object.defineProperty(res,'url',{value:'http://10.0.0.5/admin'});return url===hostsUrl?Response.json(['www.itmedia.co.jp']):res;};
  assert.equal((await handle(feedRequest('https://blog.example/feed'),redirected)).status,403);
  assert.equal((await handle(request('https://www.itmedia.co.jp/go'),redirected)).status,403);
+});
+test('Article pages are not relayed by default, while added-site feeds still work',async()=>{
+ assert.equal(ARTICLE_RELAY,false);
+ const {fetcher,calls}=fakeFetch({'https://www.itmedia.co.jp/news/a.html':{body:'<html>記事</html>'},'https://blog.example/rss':{body:'<?xml version="1.0"?><rss><channel></channel></rss>',type:'application/rss+xml'}});
+ const res=await relay(request('https://www.itmedia.co.jp/news/a.html'),fetcher);
+ assert.equal(res.status,410);assert.equal(res.headers.get('Cache-Control'),'no-store');
+ assert.deepEqual(calls,[],'記事のページを取りに行かない');
+ const feed=await relay(new Request(`https://reader.example/?feed=${encodeURIComponent('https://blog.example/rss')}`,{headers:{Origin:'https://mamamaki12.github.io'}}),fetcher);
+ assert.equal(feed.status,200);assert.equal((await feed.json()).type,'feed');
 });

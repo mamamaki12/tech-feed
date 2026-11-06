@@ -1,4 +1,4 @@
-// tech-feed の記事ページを取ってくるだけの中継。ブラウザは他サイトのページを直接読めない（CORS）ため、ここで代わりに取得する。
+// tech-feed の中継。追加したサイトのRSSを取ってくる（記事ページの中継は ARTICLE_RELAY で止めている）。ブラウザは他サイトのページを直接読めない（CORS）ため、ここで代わりに取得する。
 // 本文の取り出し・広告の除去はブラウザ側（docs/reader.js）で行う。無料プランのCPU上限（1回10ms）に収めるため、ここでは解析しない。
 const SITE='https://mamamaki12.github.io';
 const ORIGINS=[SITE,'http://127.0.0.1:4173','http://localhost:4173'];
@@ -75,7 +75,10 @@ async function listedInFeed(article,feed,fetcher){
  const listed=url=>new RegExp(url.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?=/?(["\'<\\s?#&]|$))').test(body);
  return listed(article.href)||(article.pathname.length>=8&&listed(article.origin+article.pathname));
 }
-export async function handle(request,fetcher=fetch){
+// 記事ページの中継（?url=）。公開版では、配信元の記事を丸ごと写して見せないよう止めている（2026-11-06、著作権のため）。
+// 追加したサイトのRSSの取得（?feed=）は続ける。戻すときは docs/config.js の READER_ARTICLES と一緒に true にする。
+export const ARTICLE_RELAY=false;
+export async function handle(request,fetcher=fetch,{articles=ARTICLE_RELAY}={}){
  const origin=request.headers.get('Origin');
  const cors={...SAFE_HEADERS,'Access-Control-Allow-Origin':ORIGINS.includes(origin)?origin:SITE,'Access-Control-Expose-Headers':'X-Final-URL','Vary':'Origin'};
  if(request.method==='OPTIONS')return new Response(null,{status:204,headers:{...cors,'Access-Control-Allow-Methods':'GET'}});
@@ -85,6 +88,7 @@ export async function handle(request,fetcher=fetch){
  try{target=new URL(params.get(isFeed?'feed':'url'));}catch{return reply(400,'url is required',cors);}
  if(!['http:','https:'].includes(target.protocol))return reply(400,'http(s) only',cors);
  if(isFeed)return privateHost(target.hostname)?json(403,{type:'error',message:'not allowed'},cors):handleFeed(target,cors,fetcher);
+ if(!articles)return reply(410,'article relay is turned off',cors);
  const allowed=await allowedHosts(fetcher);
  if(!allowed.has(target.hostname)){
   let feed=null;try{feed=params.has('feed')?new URL(params.get('feed')):null;}catch{}

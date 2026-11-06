@@ -37,15 +37,17 @@ const filler='<p>'+'これは本文の段落です。読みやすさを確かめ
 // アプリで開く記事のページ。本文の途中に、よくある仕掛けをいくつか混ぜる（全部の種類は上の sanitize のテストで見る）。
 const inline=[`<img src=x onerror="window.__xss='img'">`,`<a href="javascript:window.__xss='js'">リンク</a>`,`<svg onload="window.__xss='svg'"></svg>`,`<iframe src="javascript:parent.__xss='iframe'"></iframe>`,`<span style="color:red" onclick="window.__xss='click'">装飾</span>`,`<base href="https://evil.example/">`,`<meta http-equiv="refresh" content="0;url=https://evil.example/">`];
 const articlePage=`<!doctype html><html><head><title>先読みできる記事 | テスト媒体</title></head><body><header><a href="/">トップ</a></header><article><h1>先読みできる記事</h1>${filler}<p>詳しくは<a href="../docs/guide">こちらの説明</a>を見てください。設定の手順と注意点を、画面の写真つきで順番にまとめています。</p>${filler}<p>${inline.join('')}仕掛けの後ろにも本文が続きます。表示が崩れたり、別のページに移ったりしないことを確かめます。</p>${filler}</article></body></html>`;
-function relay(pages){
+function relay(pages,log=[]){
  return async route=>{
-  resetHosts();
+  resetHosts();log.push(route.request().url());
   const fetcher=async url=>{if(url.endsWith('/tech-feed/hosts.json'))return Response.json(['blog.example']);const body=pages[url];return body?new Response(body,{headers:{'Content-Type':'text/html; charset=utf-8'}}):new Response('missing',{status:404});};
-  const res=await handle(new Request(route.request().url(),{headers:{Origin:'https://mamamaki12.github.io'}}),fetcher);
+  // 記事ページの中継は公開版では止めている。先読みを試すテストのために、ここではオンにして動かす。
+  const res=await handle(new Request(route.request().url(),{headers:{Origin:'https://mamamaki12.github.io'}}),fetcher,{articles:true});
   await route.fulfill({status:res.status,headers:Object.fromEntries(res.headers),body:Buffer.from(await res.arrayBuffer())});
  };
 }
-async function openApp({storage}={}){
+// config.readerArticles：本文の先読み（公開版ではオフ）を試すときは true。開いたあとに変えると、次の読み込みから効く。
+async function openApp({storage,config={readerArticles:false}}={}){
  const context=await browser.newContext({serviceWorkers:'block',locale:'ja-JP',timezoneId:'Asia/Tokyo'});
  const now=Date.now(),articles={updatedAt:new Date(now).toISOString(),sources:[{name:'テスト媒体',url:'https://blog.example/rss',ok:true,count:2}],articles:[
   {url:'https://blog.example/posts/prefetched',title:'先読みできる記事',source:'テスト媒体',published:new Date(now-3600e3).toISOString(),body:'本文'},
@@ -53,10 +55,12 @@ async function openApp({storage}={}){
  await context.route(`${SITE}**`,async route=>{
   const path=new URL(route.request().url()).pathname.replace('/tech-feed/','')||'index.html';
   if(path==='articles.json')return route.fulfill({contentType:types.json,body:JSON.stringify(articles)});
+  if(path==='config.js'){const code=(await readFile(new URL('../docs/config.js',import.meta.url),'utf8')).replace('READER_ARTICLES=false',`READER_ARTICLES=${Boolean(config.readerArticles)}`);return route.fulfill({contentType:types.js,headers:{'Cache-Control':'no-store'},body:code});}
   try{await route.fulfill({contentType:types[path.split('.').pop()]||'application/octet-stream',body:await readFile(new URL(`../docs/${path}`,import.meta.url))});}catch{await route.fulfill({status:404,body:''});}
  });
  await context.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//,route=>route.fulfill({contentType:'text/css',body:''}));
- await context.route(`${READER_PROXY}**`,relay({'https://blog.example/posts/prefetched':articlePage}));
+ const relayed=[];
+ await context.route(`${READER_PROXY}**`,relay({'https://blog.example/posts/prefetched':articlePage},relayed));
  await context.route(/^https:\/\/(blog|img|evil)\.example\//,route=>route.fulfill({status:404,body:''}));
  await context.addInitScript(storage=>{
   window.__csp=[];addEventListener('securitypolicyviolation',e=>window.__csp.push(`${e.violatedDirective} ${e.blockedURI}`));
@@ -66,7 +70,7 @@ async function openApp({storage}={}){
  page.on('pageerror',e=>errors.push(e.message));
  await page.goto(SITE);
  await page.waitForSelector('.article .title');
- return {context,page,errors};
+ return {context,page,errors,relayed};
 }
 // 先読みした本文がブラウザ内（IndexedDB）に保存されるまで待つ。アプリより先にデータベースを作らないよう、無ければ作らずに待つ。
 async function stored(page,url){
@@ -108,7 +112,7 @@ test('The reader sanitizer keeps only safe markup for known XSS tricks',async t=
 });
 test('A prefetched article opens in the reader under the page CSP, and offline taps explain themselves',async t=>{
  if(unavailable(t))return;
- const {context,page,errors}=await openApp();
+ const {context,page,errors}=await openApp({config:{readerArticles:true}});
  await stored(page,'https://blog.example/posts/prefetched');
  await page.click('text=先読みできる記事');
  await page.waitForSelector('#reader[open] #reader-content p');
@@ -131,6 +135,29 @@ test('A prefetched article opens in the reader under the page CSP, and offline t
  assert.equal(await page.locator('article.article',{hasText:'先読みできない記事'}).evaluate(el=>el.classList.contains('read')),false);
  await page.click('text=先読みできる記事');
  await page.waitForSelector('#reader[open] #reader-content p');
+ assert.deepEqual(errors,[]);
+ await context.close();
+});
+test('With article bodies turned off (the public default), taps open the original page and old saved bodies are removed',async t=>{
+ if(unavailable(t))return;
+ const config={readerArticles:true};
+ const {context,page,errors,relayed}=await openApp({config});
+ await stored(page,'https://blog.example/posts/prefetched');
+ // 公開版と同じく本文の先読みを止めて開き直すと、前に保存した本文が消え、中継に記事を取りに行かない。
+ config.readerArticles=false;relayed.length=0;
+ await page.reload();await page.waitForSelector('.article .title');
+ let names=[];
+ for(let i=0;i<20;i++){names=await page.evaluate(async()=>(await indexedDB.databases()).map(d=>d.name));if(!names.includes('tech-feed-reader'))break;await page.waitForTimeout(250);}
+ assert.ok(!names.includes('tech-feed-reader'),JSON.stringify(names));
+ await page.waitForTimeout(2000);
+ assert.deepEqual(relayed.filter(u=>new URL(u).searchParams.has('url')),[],'記事のページを中継に頼まない');
+ // 「記事の見た目」は出さない（ダークモードは残す）。
+ await page.click('#settings');await page.waitForSelector('#dialog[open] #display h3');
+ assert.deepEqual(await page.locator('#display h3').allTextContents(),['ダークモード']);
+ await page.click('#close');
+ // 記事を押すと、アプリの中ではなく配信元のページを開く。
+ await page.click('text=先読みできる記事');
+ await page.waitForURL('https://blog.example/posts/prefetched');
  assert.deepEqual(errors,[]);
  await context.close();
 });

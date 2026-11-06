@@ -1,9 +1,9 @@
 // 電波が悪いところでも読めるように、読みそうな記事の本文を先に取得してブラウザ内（IndexedDB）に保存しておく。
 // ページの取得は Cloudflare Worker（worker/）が中継し、本文の取り出し・広告の除去はここで Readability（Firefoxのリーダービューと同じ処理）を使って行う。
 import {Readability} from './vendor/Readability.js';
-import {READER_PROXY} from './config.js';
+import {READER_PROXY,READER_ARTICLES} from './config.js';
 const DAY=86400000,KEEP_DAYS=14,MAX_ENTRIES=300,CONCURRENCY=2;
-export const enabled=Boolean(READER_PROXY)&&typeof indexedDB!=='undefined';
+export const enabled=Boolean(READER_PROXY)&&READER_ARTICLES&&typeof indexedDB!=='undefined';
 const ready=new Set(),unreadable=new Set(),inflight=new Set(),queue=[];let dbPromise,running=0;
 function db(){
  return dbPromise??=new Promise((resolve,reject)=>{const req=indexedDB.open('tech-feed-reader',1);req.onupgradeneeded=()=>req.result.createObjectStore('articles',{keyPath:'url'});req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
@@ -14,7 +14,8 @@ async function store(mode,fn){
 }
 // 古いものと多すぎる分を消し、どの記事が読めるかを覚えておく（クリック時にすぐ判定するため）。
 export async function init(){
- if(!enabled)return;
+ // 本文の先読みを止めている間は、前に保存した本文も消す（端末に記事の写しを残さない）。
+ if(!enabled){try{if(typeof indexedDB!=='undefined')indexedDB.deleteDatabase('tech-feed-reader');}catch{}return;}
  try{
   const all=await store('readonly',s=>s.getAll()),cutoff=Date.now()-KEEP_DAYS*DAY;
   const keep=all.filter(x=>x.savedAt>=cutoff).sort((x,y)=>y.savedAt-x.savedAt).slice(0,MAX_ENTRIES),keepUrls=new Set(keep.map(x=>x.url));

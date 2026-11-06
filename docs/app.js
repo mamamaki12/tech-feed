@@ -44,7 +44,8 @@ darkQuery.addEventListener('change',applyDisplay);applyDisplay();
 // 設定画面と記事画面の「Aa」で同じ選択肢を出す。
 function displayControls(container){
  container.replaceChildren();
- for(const [key,title,options] of [['readerStyle','記事の見た目',readerStyles],['theme','ダークモード',themes]]){
+ // 「記事の見た目」は本文をアプリの中で見せるときだけ使うので、止めている間は出さない。
+ for(const [key,title,options] of [...(reader.enabled?[['readerStyle','記事の見た目',readerStyles]]:[]),['theme','ダークモード',themes]]){
   const heading=document.createElement('h3'),choices=document.createElement('div');heading.textContent=title;choices.className='choices';
   for(const [value,label] of options){
    const item=document.createElement('label'),input=document.createElement('input');
