@@ -6,7 +6,11 @@ import {topicPatterns as patterns,recordClick,recordSeen,toggleLike,buildModel,r
 const $=id=>document.getElementById(id);
 const readerStyles=[['note','note風'],['tech','技術記事風（Zenn・Qiita風）']],themes=[['light','オフ'],['dark','オン'],['auto','端末に合わせる']];
 let state={read:[],saved:[],paid:[],blocked:[],excluded:'',clicks:[],likes:[],dislikes:[],seen:[],customSources:[],sort:'recommended',readerStyle:'note',theme:'light'},data,limit=40,storageOK=true;
-try{const s=JSON.parse(localStorage.getItem('tech-feed-v1'));if(s){for(const k of ['read','saved','paid','blocked'])if(Array.isArray(s[k]))state[k]=s[k].filter(x=>typeof x==='string');if(typeof s.excluded==='string')state.excluded=s.excluded;if(Array.isArray(s.clicks))state.clicks=s.clicks.filter(c=>c&&typeof c.u==='string'&&Number.isFinite(c.t)&&Array.isArray(c.f));for(const k of ['likes','dislikes'])if(Array.isArray(s[k]))state[k]=s[k].filter(l=>l&&typeof l.u==='string'&&typeof l.title==='string'&&typeof l.source==='string'&&Number.isFinite(l.t)&&Array.isArray(l.f));if(Array.isArray(s.customSources))state.customSources=s.customSources.filter(x=>x&&typeof x.name==='string'&&typeof x.feed==='string');if(Array.isArray(s.seen))state.seen=s.seen.filter(x=>x&&typeof x.u==='string'&&Number.isFinite(x.t)&&Array.isArray(x.f)&&Number.isFinite(x.n));if(['recommended','newest'].includes(s.sort))state.sort=s.sort;if(readerStyles.some(([k])=>k===s.readerStyle))state.readerStyle=s.readerStyle;if(themes.some(([k])=>k===s.theme))state.theme=s.theme;}}catch{storageOK=false;}
+const MAX_READ=5000;
+let savedState=null;try{savedState=localStorage.getItem('tech-feed-v1');}catch{storageOK=false;}
+// 保存した設定の一部が壊れていても起動できるよう、形の合わないものは読み飛ばす（特徴の一覧も文字列だけにする）。
+const withFeatures=x=>x&&typeof x.u==='string'&&Number.isFinite(x.t)&&Array.isArray(x.f)?[{...x,f:x.f.filter(f=>typeof f==='string')}]:[];
+try{const s=JSON.parse(savedState);if(s&&typeof s==='object'){for(const k of ['read','saved','paid','blocked'])if(Array.isArray(s[k]))state[k]=s[k].filter(x=>typeof x==='string');if(typeof s.excluded==='string')state.excluded=s.excluded;if(Array.isArray(s.clicks))state.clicks=s.clicks.flatMap(withFeatures);for(const k of ['likes','dislikes'])if(Array.isArray(s[k]))state[k]=s[k].flatMap(withFeatures).filter(l=>typeof l.title==='string'&&typeof l.source==='string');if(Array.isArray(s.customSources))state.customSources=s.customSources.filter(x=>x&&typeof x.name==='string'&&typeof x.feed==='string');if(Array.isArray(s.seen))state.seen=s.seen.flatMap(withFeatures).filter(x=>Number.isFinite(x.n));if(['recommended','newest'].includes(s.sort))state.sort=s.sort;if(readerStyles.some(([k])=>k===s.readerStyle))state.readerStyle=s.readerStyle;if(themes.some(([k])=>k===s.theme))state.theme=s.theme;}}catch{}
 function toast(message){$('toast').textContent=message;$('toast').style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('toast').style.display='none',3500);}
 // 表示の記録はスクロールのたびに増えるので、まとめて2秒後に保存する。
 function persistSoon(){clearTimeout(persistSoon.timer);persistSoon.timer=setTimeout(persist,2000);}
@@ -20,7 +24,7 @@ const seenObserver=new IntersectionObserver(entries=>{
   else{clearTimeout(seenTimers.get(el));seenTimers.delete(el);}
  }
 },{threshold:0.6});
-function persist(){try{localStorage.setItem('tech-feed-v1',JSON.stringify(state));}catch{storageOK=false;toast('保存できません。設定はこのページを開いている間だけ有効です。');}}
+function persist(){try{localStorage.setItem('tech-feed-v1',JSON.stringify(state));}catch{if(storageOK)toast('保存できません。設定はこのページを開いている間だけ有効です。');storageOK=false;}}
 function button(label,fn,active=false){const b=document.createElement('button');b.textContent=label;b.classList.toggle('active',active);b.addEventListener('click',fn);return b;}
 const readerReady=reader.init();
 // 表示中の未読の上位12件と「あとで読む」を先読みする。スクロールや絞り込みのたびに取り直さないよう少し待つ。
@@ -85,39 +89,46 @@ function render(){
  const search=$('search').value.trim().toLowerCase(),topic=$('topic').value,cutoff=Date.now()-Number($('period').value)*86400000;
  const excluded=state.excluded.split(/[,、\n]/).map(x=>x.trim().toLowerCase()).filter(Boolean);
  const view=$('view').value,liked=new Set(state.likes.map(l=>l.u)),disliked=new Set(state.dislikes.map(l=>l.u)),marked=view==='liked'?state.likes:view==='disliked'?state.dislikes:null;
+ // 記事が多いので、既読・保存などは毎回の検索で配列をなめずに Set で引く。
+ const read=new Set(state.read),saved=new Set(state.saved),paid=new Set(state.paid),blocked=new Set(state.blocked);
  // ハート・興味なしの一覧は、一覧から消えた古い記事も含め、付けた新しい順に出す（期間・除外設定は適用しない）。興味なしにした記事はほかの一覧には出さない。
  const current=new Map(data.articles.map(a=>[a.url,a]));
  const pool=marked?[...marked].sort((x,y)=>y.t-x.t).map(l=>current.get(l.u)||{url:l.u,title:l.title,source:l.source,published:l.published}):data.articles;
- const eligible=pool.filter(a=>marked||!disliked.has(a.url)&&!state.paid.includes(a.url)&&!state.blocked.includes(a.source)&&Date.parse(a.published)>=cutoff).filter(a=>(!$('unread').checked||!state.read.includes(a.url))&&(view!=='saved'||state.saved.includes(a.url))&&(!topic||patterns[topic].test(a.title))&&!excluded.some(w=>a.title.toLowerCase().includes(w)));
+ const hideRead=$('unread').checked;
+ const eligible=pool.filter(a=>marked||!disliked.has(a.url)&&!paid.has(a.url)&&!blocked.has(a.source)&&Date.parse(a.published)>=cutoff).filter(a=>(!hideRead||!read.has(a.url))&&(view!=='saved'||saved.has(a.url))&&(!topic||patterns[topic].test(a.title))&&!excluded.some(w=>a.title.toLowerCase().includes(w)));
  const recommended=$('sort').value==='recommended'&&!marked,model=recommended&&buildModel(data.articles,state.clicks,Date.now(),state.likes,state.seen,state.dislikes);
  const trackSeen=recommended&&view==='all'&&!search;
  seenObserver.disconnect();
- const {primary,body}=splitMatches(recommended?rankArticles(eligible,model,new Set([...state.read,...liked])):eligible,search),bodyUrls=new Set(body.map(a=>a.url)),items=[...primary,...body];
+ const {primary,body}=splitMatches(recommended?rankArticles(eligible,model,new Set([...read,...liked])):eligible,search),bodyUrls=new Set(body.map(a=>a.url)),items=[...primary,...body];
  $('articles').replaceChildren();$('count').textContent=search?`タイトル・配信元 ${primary.length}件 / 本文・概要 ${body.length}件`:`${items.length.toLocaleString()}件`;
- let bodyHeadingShown=false;
- for(const a of items.slice(0,limit)){
+ let bodyHeadingShown=false;const shown=items.slice(0,limit);
+ for(const a of shown){
   let url;try{url=new URL(a.url);if(!['http:','https:'].includes(url.protocol))continue;}catch{continue;}
   if(bodyUrls.has(a.url)&&!bodyHeadingShown){
    const heading=document.createElement('h2');heading.className='body-heading';heading.textContent='本文・概要にキーワードを含む記事';
    const note=document.createElement('p');note.className='search-note';note.textContent='配信元のRSSで取得できた本文・概要から検索しています。全文を検索できるとは限りません。';
    $('articles').append(heading,note);bodyHeadingShown=true;
   }
-  const article=document.createElement('article');article.className='article';article.classList.toggle('read',state.read.includes(a.url));
+  const article=document.createElement('article');article.className='article';article.classList.toggle('read',read.has(a.url));
   const meta=document.createElement('div');meta.className='meta';const source=document.createElement('span');source.className='source';source.textContent=a.source;const time=document.createElement('time');time.dateTime=a.published;time.textContent=new Date(a.published).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});meta.append(source,time);
   const link=document.createElement('a');link.className='title';link.textContent=a.title;link.href=url.href;link.rel='noopener noreferrer';
   const markRead=()=>{
-   if(!state.read.includes(a.url))state.read.push(a.url);
+   // 既読は30日で一覧から消える記事のぶんまで増え続けるので、新しい5000件だけ残す（同じ保存場所を使うほかのアプリの分を圧迫しないように）。
+   if(!state.read.includes(a.url)){state.read.push(a.url);if(state.read.length>MAX_READ)state.read=state.read.slice(-MAX_READ);}
    state.clicks=recordClick(state.clicks,a);persist();
    article.classList.add('read');
   };
+  // 電波がないときに保存していない記事を押したら、つながらないページへ移らずに知らせる（既読にもしない）。
+  const unreachable=()=>navigator.onLine===false&&!reader.has(a.url);
   link.addEventListener('click',event=>{
+   if(unreachable()){event.preventDefault();toast('電波がないため、この記事は開けません。電波が戻ってからもう一度お試しください。');return;}
    markRead();
    // 本文を先読み済みなら、通信せずにアプリ内で広告なしの本文を開く。
    if(reader.has(a.url)&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey){event.preventDefault();openReader(a);}
   });
   link.addEventListener('auxclick',event=>{if(event.button===1)markRead();});
   // Mark before the browser switches to the article's new tab.
-  link.addEventListener('pointerup',event=>{if(event.button===0)markRead();});
+  link.addEventListener('pointerup',event=>{if(event.button===0&&!unreachable())markRead();});
   const actions=document.createElement('div');actions.className='actions';
   // 押しても並び替えずにハートの表示だけ変える。おすすめ順には次に一覧を表示したときに反映される。
   const heart=button('',()=>{state.likes=toggleLike(state.likes,a);state.dislikes=state.dislikes.filter(l=>l.u!==a.url);persist();showHeart(state.likes.some(l=>l.u===a.url));});heart.classList.add('heart');heart.setAttribute('aria-label','ハート');heart.title='ハート';
@@ -128,11 +139,16 @@ function render(){
    :button('興味なし',()=>{
      state.dislikes=toggleLike(state.dislikes.filter(l=>l.u!==a.url),a);state.likes=state.likes.filter(l=>l.u!==a.url);persist();
      const kept=[...article.childNodes],note=document.createElement('p');note.className='dismissed-note';
-     note.append('興味なしにしました。似た記事を減らします。',button('元に戻す',()=>{state.dislikes=state.dislikes.filter(l=>l.u!==a.url);persist();article.classList.remove('dismissed');article.replaceChildren(...kept);}));
-     article.classList.add('dismissed');article.replaceChildren(note);
+     // 押したボタンが消えても、キーボードで操作している人が場所を見失わないよう「元に戻す」に移る。
+     const undo=button('元に戻す',()=>{state.dislikes=state.dislikes.filter(l=>l.u!==a.url);persist();article.classList.remove('dismissed');article.replaceChildren(...kept);dislike.focus({preventScroll:true});});
+     note.append('興味なしにしました。似た記事を減らします。',undo);
+     article.classList.add('dismissed');article.replaceChildren(note);undo.focus({preventScroll:true});
     });
   dislike.classList.add('dislike');
-  actions.append(button(state.saved.includes(a.url)?'✓ 保存済み':'＋ あとで読む',()=>{state.saved=state.saved.includes(a.url)?state.saved.filter(x=>x!==a.url):[...state.saved,a.url];persist();render();},state.saved.includes(a.url)),button('有料だった',()=>{state.paid.push(a.url);persist();render();toast('記事を非表示にしました');if(confirm(`「${a.source}」の記事をすべて除外しますか？\nキャンセルすると、この記事だけを非表示にします。`)){state.blocked.push(a.source);persist();render();}}),dislike);
+  // 「あとで読む」は一覧を作り直さずにボタンの表示だけ変える（押した場所から動かないように）。保存した記事は先読みにも加える。「あとで読む」の一覧では外した記事を消す。
+  const save=button('',()=>{const on=!state.saved.includes(a.url);state.saved=on?[...state.saved,a.url]:state.saved.filter(x=>x!==a.url);persist();if(view==='saved')render();else{showSaved(on);schedulePrefetch(shown);}});
+  const showSaved=on=>{save.textContent=on?'✓ 保存済み':'＋ あとで読む';save.classList.toggle('active',on);};showSaved(saved.has(a.url));
+  actions.append(save,button('有料だった',()=>{state.paid.push(a.url);persist();render();toast('記事を非表示にしました');if(confirm(`「${a.source}」の記事をすべて除外しますか？\nキャンセルすると、この記事だけを非表示にします。`)){state.blocked.push(a.source);persist();render();}}),dislike);
   article.append(heart,meta,link);
   if(bodyUrls.has(a.url)){
    const snippet=document.createElement('p');snippet.className='match-snippet';const text=a.body||'',index=text.toLowerCase().indexOf(search),start=Math.max(0,index-35);
@@ -145,19 +161,25 @@ function render(){
  }
  if(!items.length){const p=document.createElement('p');p.className='empty';p.textContent=view==='disliked'&&!state.dislikes.length?'興味なしにした記事はありません。記事の「興味なし」を押すと一覧から外れ、似た記事も減ります。':view==='liked'&&!state.likes.length?'まだハートを付けた記事はありません。気に入った記事の「♡」を押すと、ここに集まり、おすすめ順にも反映されます。':'該当する記事がありません。検索条件や配信元の除外設定を変更してください。';$('articles').append(p);}
  $('more').hidden=items.length<=limit;
- schedulePrefetch(items.slice(0,limit));
+ schedulePrefetch(shown);
 }
 $('sort').value=state.sort;$('sort').addEventListener('change',()=>{state.sort=$('sort').value;persist();});
-for(const id of ['search','topic','period','view','unread','sort'])$(id).addEventListener(id==='search'?'input':'change',()=>{limit=40;if(data)render();});
-$('more').onclick=()=>{limit+=40;render();};
+for(const id of ['topic','period','view','unread','sort'])$(id).addEventListener('change',()=>{limit=40;if(data)render();});
+// 検索は1文字ごとに並べ直すと入力がもたつくので、手が止まってから表示する。
+$('search').addEventListener('input',()=>{clearTimeout(render.searchTimer);render.searchTimer=setTimeout(()=>{limit=40;if(data)render();},200);});
+// キーボードで「もっと見る」を押したら、増えた最初の記事に移る。
+$('more').onclick=()=>{const first=limit;limit+=40;render();if(document.documentElement.dataset.input==='keyboard')$('articles').querySelectorAll('.article')[first]?.querySelector('.title')?.focus();};
 // ユーザーが追加したサイト。RSSは中継（worker/ の ?feed=）経由で取得し、記事はこのブラウザにだけ保存する（1サイト100件・30日まで）。
 // 追加したサイトの記事も先読みする。中継にはそのサイトのRSSも渡し、記事が本当に載っているかを中継側で確かめてもらう。
 const customKey='tech-feed-custom-v1',MAX_CUSTOM_SOURCES=20;
 let customCache={};try{customCache=JSON.parse(localStorage.getItem(customKey))||{};}catch{}
+if(typeof customCache!=='object'||Array.isArray(customCache))customCache={};
+// 保存してある追加サイトの記事。壊れた記録が混ざっていても一覧の表示を止めないよう、形の合うものだけ使う。
+const cachedArticles=feed=>{const list=customCache[feed]?.articles;return Array.isArray(list)?list.filter(a=>a&&typeof a.url==='string'&&typeof a.title==='string'&&typeof a.source==='string'&&Number.isFinite(Date.parse(a.published))):[];};
 function saveCustom(){try{localStorage.setItem(customKey,JSON.stringify(customCache));}catch{toast('追加したサイトの記事を保存できませんでした。');}}
 async function fetchFeed(url){const res=await fetch(`${READER_PROXY}?feed=${encodeURIComponent(url)}`);if(res.status>=500&&res.status!==502)throw new Error();return res.json();}
 function storeCustom(source,text,base){
- const old=customCache[source.feed]?.articles||[],cutoff=Date.now()-30*86400000;
+ const old=cachedArticles(source.feed),cutoff=Date.now()-30*86400000;
  const fresh=parseCustomFeed(text,source.name,base).map(a=>({...a,body:a.body.slice(0,200)}));
  const byUrl=new Map([...old,...fresh].map(a=>[a.url,a]));
  const articles=[...byUrl.values()].filter(a=>Date.parse(a.published)>=cutoff).sort((x,y)=>Date.parse(y.published)-Date.parse(x.published)).slice(0,100);
@@ -168,27 +190,32 @@ async function refreshCustom(force){
  if(!READER_PROXY)return false;let changed=false;
  await Promise.all(state.customSources.map(async source=>{
   const cached=customCache[source.feed];if(!force&&cached&&Date.now()-cached.fetchedAt<30*60000)return;
-  const before=cached?.articles?.length||0;
+  const before=cachedArticles(source.feed).length;
   try{const res=await fetchFeed(source.feed);if(res.type!=='feed')throw new Error();storeCustom(source,res.text,res.url);if((customCache[source.feed].articles.length)!==before||!cached)changed=true;}
-  catch{customCache[source.feed]={...(cached||{articles:[]}),fetchedAt:Date.now(),ok:false};}
+  catch{customCache[source.feed]={articles:cachedArticles(source.feed),fetchedAt:Date.now(),ok:false};}
  }));
  saveCustom();return changed;
 }
 function mergeCustom(){
  if(!data)return;
  const own=data.articles.filter(a=>!a.custom),urls=new Set(own.map(a=>a.url));
- const extra=state.customSources.flatMap(s=>(customCache[s.feed]?.articles||[]).map(a=>({...a,source:s.name,custom:true,feed:s.feed}))).filter(a=>!urls.has(a.url));
+ const extra=state.customSources.flatMap(s=>cachedArticles(s.feed).map(a=>({...a,source:s.name,custom:true,feed:s.feed}))).filter(a=>!urls.has(a.url));
  data.articles=[...own,...extra].sort((x,y)=>Date.parse(y.published)-Date.parse(x.published));
+}
+// 中継が返す理由（英語の短い言葉）を、画面に出す言葉に直す。
+function errorReason(message=''){
+ const code=message.match(/^upstream (\d+)/)?.[1];
+ return message==='fetch failed'?'応答がありません':message==='too large'?'データが大きすぎます':message==='not allowed'?'このアドレスは追加できません':code==='404'||code==='410'?'ページが見つかりません':code?`サイトのエラー ${code}`:'エラー';
 }
 async function addSource(){
  const status=$('source-status'),input=$('source-url').value.trim();
- let url;try{url=new URL(/^https?:\/\//i.test(input)?input:`https://${input}`);}catch{status.textContent='URLを確認してください。';return;}
+ let url;try{url=new URL(/^https?:\/\//i.test(input)?input:`https://${input}`);if(!url.hostname.includes('.'))throw new Error();}catch{status.textContent='URLを確認してください（例：https://example.com/）。';return;}
  if(state.customSources.length>=MAX_CUSTOM_SOURCES){status.textContent=`追加できるのは${MAX_CUSTOM_SOURCES}サイトまでです。`;return;}
  status.textContent='記事一覧（RSS）を探しています…';$('source-add').disabled=true;
  try{
   let res=await fetchFeed(url.href);
   if(res.type==='links')res=await fetchFeed(res.feeds[0].url);
-  if(res.type==='error'){status.textContent=`サイトにつながりませんでした（${res.message||'エラー'}）。URLを確かめるか、時間をおいてお試しください。`;return;}
+  if(res.type==='error'){status.textContent=`サイトにつながりませんでした（${errorReason(res.message)}）。URLを確かめるか、時間をおいてお試しください。`;return;}
   if(res.type!=='feed'){status.textContent='このサイトの記事一覧（RSS）が見つかりませんでした。RSSのURLを直接入れると追加できる場合があります。';return;}
   if(state.customSources.some(s=>s.feed===res.url)){status.textContent='このサイトはすでに追加されています。';return;}
   const names=new Set([...(data?.sources||[]).map(s=>s.name),...state.customSources.map(s=>s.name)]);
@@ -198,7 +225,7 @@ async function addSource(){
   if(!count){delete customCache[source.feed];status.textContent='記事一覧は見つかりましたが、記事を読み取れませんでした。';return;}
   state.customSources=[...state.customSources,source];persist();saveCustom();mergeCustom();render();renderSources();
   $('source-url').value='';status.textContent=`「${name}」を追加しました（${count}件）。`;
- }catch{status.textContent='サイトを読み込めませんでした。時間をおいてもう一度お試しください。';}
+ }catch{status.textContent=navigator.onLine===false?'電波がないため追加できません。電波が戻ってからもう一度お試しください。':'サイトを読み込めませんでした。時間をおいてもう一度お試しください。';}
  finally{$('source-add').disabled=false;}
 }
 function removeSource(source){
