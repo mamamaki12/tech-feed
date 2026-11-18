@@ -1,4 +1,4 @@
-# Tech Feed
+# TechFeed
 
 ## キーワード検索
 
