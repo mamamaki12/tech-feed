@@ -1,6 +1,6 @@
 {
-  "name": "Tech Feed — ひと息で、テックを。",
-  "short_name": "Tech Feed",
+  "name": "TechFeed — ひと息で、テックを。",
+  "short_name": "TechFeed",
   "lang": "ja",
   "start_url": "./",
   "scope": "./",
