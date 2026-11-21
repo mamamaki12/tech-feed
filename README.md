@@ -47,6 +47,18 @@ RSSは最新の一部の記事しか返さないため、過去30日の記事を
 
 Node.js 22以上で `npm ci` → `npm run collect` → `npm run serve`。 http://127.0.0.1:4173 を開きます。
 
+### 中継（worker/）も手元で動かすとき
+
+本文の先読みに使う中継を直すときだけ必要です。Cloudflare のアカウントやログインは要りません。別のターミナルで実行します。
+
+```sh
+cd worker
+npm ci
+npm run dev      # http://127.0.0.1:8787 で起動（何も付けずに開くと 400 が返るのが正常）
+```
+
+手元の中継を使うには、`docs/config.js` の `READER_PROXY` を一時的に `http://127.0.0.1:8787/` に書き換えます（コミットしない）。中継は http://127.0.0.1:4173 と http://localhost:4173 のページからの依頼を受け付けます。
+
 ## GitHub Pagesで公開
 
 1. Settings → Pages → Build and deployment の Source を **Deploy from a branch** に設定
